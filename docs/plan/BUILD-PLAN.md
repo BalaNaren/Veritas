@@ -205,13 +205,13 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [x] Source quality labeling by domain rules (`primary` / `secondary` / `unrated`; "unrated" means not on the recognised lists, not "bad") and `ageInDays` helper. *(Checker-agent fallback for unrated sources and the recency flag on fast-changing figures are applied in the verifier.)*
 
 **5. Verifier** (`src/verify/`) — PRODUCT.md §10.3
-- [ ] Step 1 *source exists* (code): source fetched in this task and stored.
-- [ ] Step 2 *quote matches* (code): normalized (whitespace, quotes, dashes, case-insensitive) substring match in the snapshot; record location.
-- [ ] Step 3 *support check* (checker agent, haiku, no tools, sees only claim + passage ± context): verdict `supported | partial | not_supported | contradicted` + reason, schema-enforced.
-- [ ] Step 4 *numbers* (code + checker): every number in the claim must appear in the quote (normalize units/commas/%).
-- [ ] Step 5 *cross-check* (checker): for `important` claims, compare with other sources' claims; disagreements → flagged with both sides.
-- [ ] Outcome mapping → `confirmed | flagged | removed | analysis`; verification summary object.
-- [ ] Prompt-injection hardening: source text wrapped as data with explicit delimiters; checker has no tools.
+- [x] Step 1 *source exists* (code): source fetched in this task and stored.
+- [x] Step 2 *quote matches* (code): normalized (whitespace, quotes, dashes, case-insensitive) substring match in the snapshot; record location.
+- [x] Step 3 *support check* (checker agent, haiku, no tools, sees only claim + passage ± context): verdict `supported | partial | not_supported | contradicted` + reason, schema-enforced.
+- [x] Step 4 *numbers* (code + checker): every number in the claim must appear in the quote (normalize units/commas/%).
+- [x] Step 5 *cross-check* (checker): for `important` claims, compare with other sources' claims; disagreements → flagged with both sides.
+- [x] Outcome mapping → `confirmed | flagged | removed | analysis`; verification summary object.
+- [x] Prompt-injection hardening: source text wrapped as data with explicit delimiters; checker has no tools.
 
 **6. Writer / assembler** (`src/write/`)
 - [ ] Writer agent (opus, no tools) receives only verified/flagged claims with IDs; must cite `[c<ID>]` for every factual statement; analysis sentences marked.
