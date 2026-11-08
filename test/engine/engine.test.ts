@@ -161,3 +161,53 @@ describe('Engine', () => {
     expect(() => engine.decide(a.id, 'denied')).toThrow(/already decided/);
   });
 });
+
+describe('Engine clarifying', () => {
+  const questionsProvider = (): ModelProvider => ({
+    id: 'claude-code',
+    async run(r) {
+      if (r.jsonSchema && JSON.stringify(r.jsonSchema).includes('"questions"')) {
+        return ok({ json: { questions: [{ id: 'q1', text: 'Which region?', options: ['EU', 'US'], default: 'US' }], assumptions: ['English only'] }, costUsd: 0.003 });
+      }
+      return fakeProvider().run(r);
+    },
+  });
+
+  it('asks the person, stores answers as assumptions, and passes them to the planner and workers', async () => {
+    const seen: string[] = [];
+    const base = questionsProvider();
+    const provider: ModelProvider = { id: base.id, run: (r) => { seen.push(r.prompt); return base.run(r); } };
+    const { engine } = setup(provider);
+    const t = engine.createTask('goal');
+    const r = await engine.execute(t.id, { approver: yes, clarify: { mode: 'ask', ask: async () => ({ q1: 'EU' }) } });
+    expect(r.task.status).toBe('done');
+    expect(r.task.assumptions).toEqual(['Which region? EU', 'English only', 'Assumed English']);
+    expect(seen.some((p) => p.includes('Already decided') && p.includes('Which region? EU'))).toBe(true);
+    expect(readFileSync(r.resultPath!, 'utf8')).toContain('## Assumptions');
+  });
+
+  it('uses the default answers when the person gives none', async () => {
+    const { engine } = setup(questionsProvider());
+    const t = engine.createTask('goal');
+    const r = await engine.execute(t.id, { approver: yes, clarify: { mode: 'defaults' } });
+    expect(r.task.assumptions[0]).toBe('Which region? US (assumed)');
+  });
+
+  it('does not ask again when resumed, and skips cleanly when the clarifier fails', async () => {
+    let clarifierCalls = 0;
+    const failing: ModelProvider = {
+      id: 'claude-code',
+      async run(r) {
+        if (r.jsonSchema && JSON.stringify(r.jsonSchema).includes('"questions"')) { clarifierCalls++; return ok({ ok: false, error: { kind: 'process', message: 'x' } }); }
+        return fakeProvider().run(r);
+      },
+    };
+    const { engine, store } = setup(failing);
+    const t = engine.createTask('goal');
+    const r = await engine.execute(t.id, { approver: yes, clarify: { mode: 'ask', ask: async () => null } });
+    expect(r.task.status).toBe('done');
+    expect(store.listEvents(t.id).map((e) => e.type)).toContain('clarify.skipped');
+    await engine.execute(t.id, { clarify: { mode: 'ask' } });
+    expect(clarifierCalls).toBe(1);
+  });
+});

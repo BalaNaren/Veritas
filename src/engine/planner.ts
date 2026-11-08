@@ -5,7 +5,7 @@ import { estimatePlanCost, type CostHistory } from '../cost/estimate.js';
 import type { Plan } from './plan.js';
 import { kindIds } from './kinds.js';
 import { planJsonSchema, validatePlanDraft, type PlanLimits } from './plan-schema.js';
-import { plannerPrompt, plannerRetryPrompt } from './prompts.js';
+import { goalWithContext, plannerPrompt, plannerRetryPrompt } from './prompts.js';
 import { tryJsonParse } from '../shared/json.js';
 
 export interface PlannerOptions {
@@ -13,6 +13,8 @@ export interface PlannerOptions {
   config: Pick<VeritasConfig, 'models' | 'maxSubtasks' | 'agentTimeoutMs'>;
   cwd: string;
   history?: CostHistory;
+  /** Answers and assumptions already settled with the person. */
+  decided?: readonly string[];
   signal?: AbortSignal;
   /** Spending cap for one planner call. */
   maxBudgetUsd?: number;
@@ -28,7 +30,8 @@ export async function planGoal(goal: string, opts: PlannerOptions): Promise<Plan
   const schema = planJsonSchema(limits);
   const model = modelFor('planner', opts.config.models);
   let cost = 0;
-  let prompt = plannerPrompt(goal, limits.maxSubtasks, limits.kinds);
+  const fullGoal = goalWithContext(goal, opts.decided ?? []);
+  let prompt = plannerPrompt(fullGoal, limits.maxSubtasks, limits.kinds);
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const res: AgentRunResult = await opts.provider.run({
@@ -53,7 +56,7 @@ export async function planGoal(goal: string, opts: PlannerOptions): Promise<Plan
       };
     }
     if (attempt === 2) return { ok: false, error: `The planner returned an invalid plan: ${check.errors.join(' ')}`, costUsd: cost };
-    prompt = plannerRetryPrompt(goal, limits.maxSubtasks, limits.kinds, check.errors);
+    prompt = plannerRetryPrompt(fullGoal, limits.maxSubtasks, limits.kinds, check.errors);
   }
   return { ok: false, error: 'Planning failed.', costUsd: cost };
 }

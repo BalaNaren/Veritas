@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { formatUsd } from '../../cost/estimate.js';
-import type { Approver } from '../../engine/engine.js';
+import type { ClarifyQuestion } from '../../clarify/clarifier.js';
+import type { Approver, ClarifyOptions } from '../../engine/engine.js';
 import type { TaskRow } from '../../storage/models.js';
 import { App } from '../app.js';
 import { formatPlan } from '../format.js';
@@ -45,8 +46,24 @@ function makeApprover(app: App): Approver {
   };
 }
 
+/** Put each question to the person; Enter takes the default, a number picks a suggested option. */
+async function askQuestions(app: App, questions: ClarifyQuestion[]): Promise<Record<string, string>> {
+  const out = app.rt.out;
+  out.writeln(out.bold('A few questions before planning (press Enter to accept the suggested answer):'));
+  const answers: Record<string, string> = {};
+  for (const q of questions) {
+    out.writeln(`\n${q.text}`);
+    q.options.forEach((o, i) => out.writeln(`  ${i + 1}. ${o}`));
+    const raw = (await app.rt.ask(`  [${q.default}] > `)).trim();
+    const pick = Number(raw);
+    answers[q.id] = !raw ? q.default : Number.isInteger(pick) && pick >= 1 && pick <= q.options.length ? q.options[pick - 1]! : raw;
+  }
+  out.writeln();
+  return answers;
+}
+
 /** Run (or continue) a task, showing progress, and report where it ended up. Returns the exit code. */
-export async function drive(app: App, taskId: string, opts: { yesPlan?: boolean; interactive: boolean }): Promise<number> {
+export async function drive(app: App, taskId: string, opts: { yesPlan?: boolean; interactive: boolean; clarify?: 'off' | 'defaults' | 'ask' }): Promise<number> {
   const { out } = app.rt;
   const engine = app.engine({ preApprove: opts.yesPlan ? ['plan.start'] : [] });
   const stopFollowing = followTask(out, (fn, id) => engine.events.subscribe(fn, id), taskId);
@@ -58,7 +75,8 @@ export async function drive(app: App, taskId: string, opts: { yesPlan?: boolean;
     else process.exit(130);
   });
   try {
-    const result = await engine.execute(taskId, { signal: abort.signal, approver: opts.interactive ? makeApprover(app) : undefined });
+    const clarify: ClarifyOptions = { mode: opts.clarify ?? 'off', ask: (q) => askQuestions(app, q) };
+    const result = await engine.execute(taskId, { signal: abort.signal, clarify, approver: opts.interactive ? makeApprover(app) : undefined });
     return report(app, result.task, result.resultPath);
   } finally {
     stopListening();
@@ -118,6 +136,10 @@ const budgetFrom = (ctx: CommandContext): number | undefined => {
   return n;
 };
 
+/** Interactive runs ask questions unless --quick; unattended runs only use the model's default answers when --clarify is given. */
+const clarifyMode = (ctx: CommandContext, interactive: boolean): 'off' | 'defaults' | 'ask' =>
+  ctx.flags.quick === true ? 'off' : interactive ? 'ask' : ctx.flags.clarify === true ? 'defaults' : 'off';
+
 const exit = (code: number): CommandResult => ({ success: code === 0, exitCode: code });
 
 export function runCommands(app: App): Command[] {
@@ -129,22 +151,27 @@ export function runCommands(app: App): Command[] {
       options: [
         { name: 'budget', type: 'number', description: 'Spending limit in US dollars (default from config)' },
         { name: 'yes-plan', type: 'boolean', description: 'Approve the plan without asking (budget increases still always ask)' },
+        { name: 'quick', type: 'boolean', description: 'Skip the clarifying questions' },
+        { name: 'clarify', type: 'boolean', description: 'When not interactive, still check the goal and record default answers as assumptions' },
       ],
       examples: [{ command: 'veritas run "Summarise the main causes of the 2008 crisis" --budget 1', description: 'Run with a $1 limit' }],
       action: async (ctx) => {
         const task = app.engine().createTask(goalFrom(ctx), { budgetUsd: budgetFrom(ctx), cwd: app.rt.cwd });
         app.rt.out.writeln(app.rt.out.dim(`Task ${task.id}`));
-        return exit(await drive(app, task.id, { yesPlan: ctx.flags.yesPlan === true, interactive: interactive(ctx) }));
+        return exit(await drive(app, task.id, { yesPlan: ctx.flags.yesPlan === true, interactive: interactive(ctx), clarify: clarifyMode(ctx, interactive(ctx)) }));
       },
     },
     {
       name: 'plan',
       description: 'Plan a goal and show the plan and cost estimate without running anything',
-      options: [{ name: 'budget', type: 'number', description: 'Spending limit in US dollars' }],
+      options: [
+        { name: 'budget', type: 'number', description: 'Spending limit in US dollars' },
+        { name: 'clarify', type: 'boolean', description: 'Check the goal first and record default answers as assumptions' },
+      ],
       action: async (ctx) => {
         const task = app.engine().createTask(goalFrom(ctx), { budgetUsd: budgetFrom(ctx), cwd: app.rt.cwd });
         app.rt.out.writeln(app.rt.out.dim(`Task ${task.id}`));
-        return exit(await drive(app, task.id, { interactive: false }));
+        return exit(await drive(app, task.id, { interactive: false, clarify: clarifyMode(ctx, false) }));
       },
     },
     {

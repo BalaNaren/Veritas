@@ -8,6 +8,8 @@ const d = (e: EventRow): Record<string, unknown> => (e.data && typeof e.data ===
 export function describeEvent(out: OutputFormatter, e: EventRow, verbose = false): string | null {
   const x = d(e);
   switch (e.type) {
+    case 'clarify.started': return out.dim('Checking the goal...');
+    case 'clarify.skipped': return out.dim('Could not check the goal for questions; continuing.');
     case 'plan.started': return out.dim('Planning...');
     case 'plan.created': return out.dim(`Plan ready: ${x.tasks} task${x.tasks === 1 ? '' : 's'}`);
     case 'plan.failed': return out.error(`Planning failed: ${x.error}`);

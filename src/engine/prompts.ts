@@ -3,6 +3,11 @@ import type { SubtaskRow } from '../storage/models.js';
 
 const fence = (text: string): string => text.replace(/<\/?(goal|result|task)\b[^>]*>/gi, '');
 
+/** The goal plus everything already decided about it (answers and assumptions). */
+export function goalWithContext(goal: string, decided: readonly string[]): string {
+  return decided.length ? `${goal}\n\nAlready decided:\n${decided.map((d) => `- ${d}`).join('\n')}` : goal;
+}
+
 export function plannerPrompt(goal: string, maxSubtasks: number, kinds: readonly string[]): string {
   const kindLines = kinds.map((k) => `- ${k}: ${WORKER_KINDS[k]?.description ?? ''}`).join('\n');
   return `You are the planning agent of Veritas, a system that completes a goal by running several agents, some in parallel.

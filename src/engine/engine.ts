@@ -10,6 +10,7 @@ import { TERMINAL_TASK_STATUSES } from '../storage/models.js';
 import { taskDir } from '../storage/paths.js';
 import type { Store } from '../storage/store.js';
 import { EventLog } from './event-log.js';
+import { answersToStatements, clarifyGoal, type ClarifyQuestion } from '../clarify/clarifier.js';
 import { planGoal } from './planner.js';
 import { runSubtasks } from './scheduler.js';
 
@@ -27,7 +28,16 @@ export interface EngineOptions {
   retryDelayMs?: number;
 }
 
+/** Whether to ask the person questions about the goal before planning. */
+export interface ClarifyOptions {
+  /** `off`: no questions; `defaults`: ask the model but use its default answers; `ask`: put the questions to the person. */
+  mode: 'off' | 'defaults' | 'ask';
+  /** Returns the person's answers by question id, or null to use the defaults. */
+  ask?: (questions: ClarifyQuestion[]) => Promise<Record<string, string> | null>;
+}
+
 export interface ExecuteOptions {
+  clarify?: ClarifyOptions;
   signal?: AbortSignal;
   /** Asked whenever the policy says a person must decide. Without one, every question is deferred. */
   approver?: Approver;
@@ -96,6 +106,10 @@ export class Engine {
     const needsPlan = task.status === 'draft' || task.status === 'clarifying'
       || (task.status === 'paused' && this.store.listSubtasks(task.id).length === 0);
     if (needsPlan) {
+      if (opts.clarify && opts.clarify.mode !== 'off') {
+        task = await this.clarify(task, opts.clarify, signal);
+        if (task.status === 'paused') return { task };
+      }
       task = await this.plan(task, signal);
       if (task.status === 'failed' || task.status === 'paused') return { task };
     }
@@ -118,11 +132,43 @@ export class Engine {
 
   // ------------------------------------------------------------------
 
+  private async clarify(task: TaskRow, options: ClarifyOptions, signal?: AbortSignal): Promise<TaskRow> {
+    const done = this.store.listEvents(task.id).some((e) => e.type === 'clarify.answered' || e.type === 'clarify.skipped');
+    if (done) return task;
+    this.store.updateTask(task.id, { status: 'clarifying' });
+    this.events.emit(task.id, 'clarify.started');
+    const outcome = await clarifyGoal(task.goal, { provider: this.provider, config: this.config, cwd: task.cwd, signal });
+    if (outcome.costUsd > 0) this.store.addSpent(task.id, outcome.costUsd);
+    if (!outcome.ok) {
+      if (signal?.aborted) {
+        this.events.emit(task.id, 'task.interrupted');
+        return this.store.updateTask(task.id, { status: 'paused' });
+      }
+      // Questions are a convenience; not being able to ask must not block the work.
+      this.events.emit(task.id, 'clarify.skipped', { error: outcome.error });
+      return this.store.updateTask(task.id, { status: 'draft' });
+    }
+    const { questions, assumptions } = outcome.result;
+    let answers: Record<string, string> = {};
+    let usedDefaults = true;
+    if (questions.length) {
+      this.events.emit(task.id, 'clarify.asked', { questions });
+      if (options.mode === 'ask' && options.ask) {
+        const given = await options.ask(questions);
+        if (given) { answers = given; usedDefaults = false; }
+      }
+    }
+    const statements = answersToStatements(questions, answers);
+    const merged = [...new Set([...task.assumptions, ...statements, ...assumptions])];
+    this.events.emit(task.id, 'clarify.answered', { answers, usedDefaults, questions: questions.length });
+    return this.store.updateTask(task.id, { status: 'draft', assumptions: merged });
+  }
+
   private async plan(task: TaskRow, signal?: AbortSignal): Promise<TaskRow> {
     this.events.emit(task.id, 'plan.started');
     const outcome = await planGoal(task.goal, {
       provider: this.provider, config: this.config, cwd: task.cwd, signal,
-      history: this.store.averageSubtaskCostByModel(),
+      history: this.store.averageSubtaskCostByModel(), decided: task.assumptions,
     });
     if (outcome.costUsd > 0) this.store.addSpent(task.id, outcome.costUsd);
     if (!outcome.ok) {
@@ -133,7 +179,7 @@ export class Engine {
       this.events.emit(task.id, 'plan.failed', { error: outcome.error });
       return this.store.updateTask(task.id, { status: 'failed', error: outcome.error });
     }
-    const { plan } = outcome;
+    const plan = { ...outcome.plan, assumptions: [...new Set([...task.assumptions, ...outcome.plan.assumptions])] };
     this.store.transaction(() => {
       this.store.deleteSubtasks(task.id);
       this.store.createSubtasks(task.id, plan.subtasks);
@@ -254,5 +300,8 @@ export function composeResult(task: TaskRow, subtasks: readonly SubtaskRow[]): s
   const body = sinks.length === 1
     ? text(sinks[0]!)
     : sinks.map((s) => `## ${s.title}\n\n${text(s)}`).join('\n\n');
-  return `# ${task.goal}\n\n${body.trim()}\n`;
+  const assumed = task.assumptions.length
+    ? `## Assumptions\n\n${task.assumptions.map((a) => `- ${a}`).join('\n')}\n\n`
+    : '';
+  return `# ${task.goal}\n\n${assumed}${body.trim()}\n`;
 }

@@ -6,7 +6,7 @@ import type { Store } from '../storage/store.js';
 import type { SubtaskRow, TaskRow } from '../storage/models.js';
 import type { EventLog } from './event-log.js';
 import { getKind } from './kinds.js';
-import { workerPrompt, type DependencyResult } from './prompts.js';
+import { goalWithContext, workerPrompt, type DependencyResult } from './prompts.js';
 
 export type RunOutcome =
   | { status: 'done' }
@@ -67,7 +67,7 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
       const d = byKey.get(k)!;
       return { key: d.key, title: d.title, text: typeof d.output === 'string' ? d.output : JSON.stringify(d.output ?? '') };
     });
-    const prompt = workerPrompt(task.goal, s, deps);
+    const prompt = workerPrompt(goalWithContext(task.goal, task.assumptions), s, deps);
 
     store.updateSubtask(s.id, { status: 'running', startedAt: new Date().toISOString(), model });
     events.emit(task.id, 'subtask.started', { key: s.key, title: s.title, model }, s.id);

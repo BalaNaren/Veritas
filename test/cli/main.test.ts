@@ -143,4 +143,22 @@ describe('veritas CLI', () => {
     expect(await notLoggedIn.run('doctor')).toBe(1);
     expect(await harness().run('doctor')).toBe(0);
   });
+
+  it('asks clarifying questions interactively and records the answers', async () => {
+    const h = harness({ interactive: true, answers: ['2', '', 'y'] });
+    expect(await h.run('run', '[[fake:ask]] tides')).toBe(0);
+    expect(h.asked[0]).toContain('[Global]');
+    expect(h.out()).toContain('A few questions');
+    expect(h.out()).toContain('Which region? Europe');
+    expect(h.out()).toContain('How deep? Overview');
+  });
+
+  it('skips questions with --quick, and only uses defaults unattended with --clarify', async () => {
+    const q = harness({ interactive: true, answers: ['y'] });
+    expect(await q.run('run', '[[fake:ask]] tides', '--quick')).toBe(0);
+    expect(q.out()).not.toContain('A few questions');
+    const u = harness();
+    expect(await u.run('run', '[[fake:ask]] tides', '--yes-plan', '--clarify')).toBe(0);
+    expect(u.out()).toContain('Which region? Global (assumed)');
+  });
 });

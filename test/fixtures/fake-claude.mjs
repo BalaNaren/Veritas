@@ -67,6 +67,23 @@ switch (mode) {
     print(envelope({ result: JSON.stringify(plan), structured_output: plan }));
     break;
   }
+  case 'ask': {
+    // Schema-aware: answers the clarifier with two questions and the planner with a plan.
+    const schema = flag('--json-schema') ?? '';
+    if (schema.includes('"questions"')) {
+      const out = {
+        questions: [
+          { id: 'q1', text: 'Which region?', options: ['Global', 'Europe'], default: 'Global' },
+          { id: 'q2', text: 'How deep?', options: [], default: 'Overview' },
+        ],
+        assumptions: ['English sources only'],
+      };
+      print(envelope({ result: JSON.stringify(out), structured_output: out, total_cost_usd: 0.004 }));
+    }
+    const plan = { subtasks: [{ key: 't1', title: 'Only task', kind: 'general', instructions: 'Do it', dependsOn: [] }], assumptions: [] };
+    print(envelope({ result: JSON.stringify(plan), structured_output: plan }));
+    break;
+  }
   default:
     print(envelope({ result: 'echo:' + prompt.trim().replace(/\[\[fake:[^\]]*\]\]/g, '').trim(), model: flag('--model') }));
 }
