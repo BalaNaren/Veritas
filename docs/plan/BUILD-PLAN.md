@@ -148,21 +148,21 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [x] Tests with a **fake `claude` binary** (a node script on PATH in the test env) covering success, error envelope, timeout kill, oversized output, invalid JSON.
 
 **7. Engine**
-- [ ] `src/engine/task-manager.ts`: create/load/transition tasks (state machine above), pause/resume/cancel.
-- [ ] `src/engine/planner.ts`: planner agent (opus, no tools) returns schema-validated plan `{subtasks:[{title, kind, instructions, dependsOn[], model}], estimateUsd:{low,high}, assumptions[]}`; reject cycles; cap subtasks (default 8).
-- [ ] `src/engine/scheduler.ts` (~300 lines, new): runs subtasks respecting `dependsOn`, concurrency limit (default 4), retries with backoff, posts `subtask.*` events; adapt message bus + agent pool (§3) for bookkeeping.
-- [ ] `src/engine/event-log.ts`: append events, subscribe for live progress, replay for `veritas show`.
-- [ ] Generic worker kind for M1: `general` (agent with no tools) so the engine is exercised end-to-end before task types exist.
+- [x] `src/engine/engine.ts`: create/load/transition tasks (state machine above), pause/resume/cancel.
+- [x] `src/engine/planner.ts`: planner agent (opus, no tools) returns schema-validated plan `{subtasks:[{title, kind, instructions, dependsOn[], model}], estimateUsd:{low,high}, assumptions[]}`; reject cycles; cap subtasks (default 8).
+- [x] `src/engine/scheduler.ts` (~300 lines, new): runs subtasks respecting `dependsOn`, concurrency limit (default 4), retries with backoff, posts `subtask.*` events; adapt message bus + agent pool (§3) for bookkeeping.
+- [x] `src/engine/event-log.ts`: append events, subscribe for live progress, replay for `veritas show`.
+- [x] Generic worker kind for M1: `general` (agent with no tools) so the engine is exercised end-to-end before task types exist.
 
 **8. Cost & budget** (§12)
-- [ ] Per-run cost from the envelope; accumulate per subtask and task; `cost.updated` events.
-- [ ] Budget enforcement: pass remaining budget as `--max-budget-usd` to each agent; scheduler stops dispatching and pauses the task at 100%; asks approval to continue (policy gate).
+- [x] Per-run cost from the envelope; accumulate per subtask and task; `cost.updated` events.
+- [x] Budget enforcement: pass remaining budget as `--max-budget-usd` to each agent; scheduler stops dispatching and pauses the task at 100%; asks approval to continue (policy gate).
 - [ ] `veritas cost` report (by task / day / model) from the DB. Optional: transcript ledger (adapted `claudeRows` with dedupe) for cross-checking.
 - [ ] Price book only used for **estimates** (re-verify rates; mark `priced:false` for unknown models).
 
 **9. Policy & approvals** (§13)
-- [ ] Adapt policy core (types, evaluator, engine) → `src/policy/`, **default mode `enforce`, default-deny** for risky actions.
-- [ ] Approval actions: `plan.start`, `budget.exceed`, (M2+) `network.new_destination`, (M4) `git.commit/push/merge`, `fs.write_outside_output`, `cmd.first_run`.
+- [x] Adapt policy core (types, evaluator, engine) → `src/policy/`, **default mode `enforce`, default-deny** for risky actions.
+- [x] Approval actions: `plan.start`, `budget.exceed`, (M2+) `network.new_destination`, (M4) `git.commit/push/merge`, `fs.write_outside_output`, `cmd.first_run`.
 - [ ] CLI prompt for approvals when interactive; `veritas approve <id>` when not. AI can never approve.
 
 **10. CLI experience**
