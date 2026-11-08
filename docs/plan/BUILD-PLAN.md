@@ -111,16 +111,16 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 ### M1 tasks
 
 **1. Repo bootstrap**
-- [ ] `package.json` (name `veritas`, `type: module`, `bin: {veritas: bin/veritas.js}`, `engines: {node: ">=22.13"}`), exact-pinned dev deps: `typescript`, `vitest`, `@types/node`.
-- [ ] `tsconfig.json` (ES2022, NodeNext, strict incl. `noImplicitAny`), `vitest.config.ts`, `.gitignore`, `LICENSE` (Apache-2.0), `README.md` stub.
-- [ ] `scripts/clean-check.mjs`: fails if banned upstream terms appear in `src/ test/ docs/ README.md package.json`; wired into `npm test`.
-- [ ] GitHub Actions: `npm ci && npm run build && npm test` on push/PR (actions pinned to commit SHAs).
+- [x] `package.json` (name `veritas`, `type: module`, `bin: {veritas: bin/veritas.js}`, `engines: {node: ">=22.13"}`), exact-pinned dev deps: `typescript`, `vitest`, `@types/node`.
+- [x] `tsconfig.json` (ES2022, NodeNext, strict incl. `noImplicitAny`), `vitest.config.ts`, `.gitignore`, `LICENSE` (Apache-2.0), `README.md` stub.
+- [x] `scripts/clean-check.mjs`: fails if banned upstream terms appear in `src/ test/ docs/ README.md package.json`; wired into `npm test`.
+- [x] GitHub Actions: `npm ci && npm run build && npm test` on push/PR (actions pinned to commit SHAs).
 
 **2. Spike: confirm `claude -p` behaviour (do first, record results in `docs/plan/notes-claude-cli.md`)**
-- [ ] Run a tiny prompt with `claude -p --output-format json --no-session-persistence --model haiku` (prompt on stdin); record exact envelope fields (`result`, `is_error`, `total_cost_usd`, `usage`, `duration_ms`, `session_id`).
-- [ ] Confirm `--json-schema` makes `result` (or a structured field) schema-valid JSON.
-- [ ] Confirm `--allowed-tools`, `--permission-mode dontAsk`, `--max-budget-usd` behaviour (what happens when budget is hit).
-- [ ] Confirm running several in parallel works and does not touch the user's session history.
+- [x] Run a tiny prompt with `claude -p --output-format json --no-session-persistence --model haiku` (prompt on stdin); record exact envelope fields (`result`, `is_error`, `total_cost_usd`, `usage`, `duration_ms`, `session_id`).
+- [x] Confirm `--json-schema` makes `result` (or a structured field) schema-valid JSON.
+- [x] Confirm `--allowed-tools`, `--permission-mode dontAsk`, `--max-budget-usd` behaviour (what happens when budget is hit).
+- [x] Confirm running several in parallel works and does not touch the user's session history.
 
 **3. CLI framework** (§1)
 - [ ] Adapt `types.ts`, `output.ts`, `parser.ts`, `blocking-stdio.ts` → `src/cli/`. Optional `prompt.ts`, `suggest.ts`.
