@@ -1,0 +1,32 @@
+{
+  "name": "veritas",
+  "version": "0.1.0",
+  "description": "An AI task agent that proves its work: parallel agents do the job and every claim is verified against its source.",
+  "license": "Apache-2.0",
+  "author": "Bala Naren Chanumolu <4568naren@gmail.com>",
+  "type": "module",
+  "bin": {
+    "veritas": "bin/veritas.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean-check": "node scripts/clean-check.mjs",
+    "test": "npm run clean-check && vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}
