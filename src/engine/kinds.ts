@@ -36,8 +36,8 @@ export const WORKER_KINDS: Readonly<Record<string, WorkerKind>> = {
     validateOutput: (json) => { const r = validateFindings(json); return r.ok ? null : r.error; },
     guidance: `Research method:
 - Search, then actually open and read the pages you rely on. Only report what you read on a page you opened.
-- Report each claim as one self-contained statement. For every claim give the exact address of the page and a quote copied word for word from that page that supports it. Never paraphrase inside "quote" and never write a quote from memory.
-- Use type "number" for claims built around a figure; every figure in the claim must appear in the quote. Use "quote" for something a person or document said.
+- Report each claim as one self-contained statement of the fact itself; do not write "according to ..." (the source is recorded separately). For every claim give the exact address of the page and a quote copied character for character from that page's text. Never paraphrase inside "quote", never add or change punctuation, never put quotation marks or labels around it, never reformat table rows, and never write a quote from memory.
+- Use type "number" for claims built around a figure. Every figure in the claim must appear in the quote exactly as the page writes it: do not convert units, round, or combine figures. If the page gives 0.3844 million km, the claim says 0.3844 million km. Use "quote" for something a person or document said.
 - Prefer primary sources (official, government, original research) and recent pages. If sources disagree, report both.
 - Mark a claim "important" if the answer depends on it.
 - It is better to report fewer, well-supported claims than many weak ones. If you cannot find something, say so in "notes".

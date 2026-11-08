@@ -52,7 +52,7 @@ function provider(b: Behaviour = {}): ModelProvider & { kinds: string[] } {
         const findings = b.findings?.(key) ?? [{ claim: 'The Moon is about 384,400 km from Earth.', type: 'number', url: url('/moon'), title: 'Moon', quote: 'average distance of 384,400 km', important: false }];
         return ok({ json: { findings, notes: '' }, costUsd: 0.1 });
       }
-      if (kind === 'checker') return ok({ json: { verdict: b.checkerVerdict ?? 'supported', reason: 'The passage says so.', against: [] }, costUsd: 0.005 });
+      if (kind === 'checker') return ok({ json: { verdict: b.checkerVerdict ?? 'supported', reason: 'The passage says so.', timeSensitive: false, against: [] }, costUsd: 0.005 });
       return ok({ text: b.writer ?? 'The Moon is about 384,400 km from Earth [c1]. It orbits in 27.3 days [c2].\n\nAnalysis: that is a remarkably steady neighbour.', costUsd: 0.2 });
     },
   };

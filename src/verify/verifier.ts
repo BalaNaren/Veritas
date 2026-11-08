@@ -32,7 +32,7 @@ export interface VerificationSummary {
   costUsd: number;
 }
 
-/** A source this old, for a number, gets flagged as possibly out of date. */
+/** A source this old, for a claim the checker judges time-sensitive, gets flagged as possibly out of date. */
 export const STALE_NUMBER_DAYS = 730;
 const CROSS_CANDIDATES = 5;
 const MIN_OVERLAP = 0.15;
@@ -99,7 +99,7 @@ async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: rea
 
   // 3. An independent checker judges whether the passage supports the claim.
   const passage = passageAround(snapshot, match.start!, match.end!);
-  const support = await o.checker.support({ claim: claim.text, passage });
+  const support = await o.checker.support({ claim: claim.text, passage, source: { title: source.title, url: source.finalUrl } });
   costUsd += support.costUsd;
   if (support.verdict === 'not_supported' || support.verdict === 'contradicted') {
     checks.push(fail('support', `${support.verdict === 'contradicted' ? 'Contradicted' : 'Not supported'}: ${support.reason}`));
@@ -114,7 +114,7 @@ async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: rea
   // Source quality and age.
   if (claim.important && source.quality === 'unrated') flags.push('Important claim backed only by a source that is not on the recognised lists');
   const age = ageInDays(source.publishedAt, o.now);
-  if (claim.type === 'number' && age !== null && age > STALE_NUMBER_DAYS) flags.push(`Source is ${Math.floor(age / 365)} years old for a figure that may have changed`);
+  if (support.timeSensitive && age !== null && age > STALE_NUMBER_DAYS) flags.push(`Source is ${Math.floor(age / 365)} years old for a figure that may have changed`);
 
   // 5. Important claims are compared with what other sources say.
   if (claim.important) {

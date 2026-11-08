@@ -27,7 +27,7 @@ export function writerPrompt(goal: string, assumptions: readonly string[], claim
   return `You write the final report for a user. You may use ONLY the checked claims below. Nothing else is known to you.
 
 Rules:
-- Write clear Markdown with short headings. Lead with the answer to the goal.
+- Write clear Markdown with short headings (use ## and ###, never a top-level # heading; the title is added for you). Lead with the answer to the goal.
 - Every sentence that states a fact, figure, date or name must end with the citation markers of the claims it relies on, written exactly like [c3] or [c3][c7]. Use only ids from the list.
 - Do not add any fact, number, name or date that is not in the claims. You may combine and compare claims, but every number you write must appear in a claim you cite.
 - Claims marked FLAGGED are weaker. Word them with care ("according to", "reportedly") and say what the flag is when it matters, but still cite them.
