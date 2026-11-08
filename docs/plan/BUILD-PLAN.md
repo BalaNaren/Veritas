@@ -123,15 +123,15 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [x] Confirm running several in parallel works and does not touch the user's session history.
 
 **3. CLI framework** (§1)
-- [ ] Adapt `types.ts`, `output.ts`, `parser.ts`, `blocking-stdio.ts` → `src/cli/`. Optional `prompt.ts`, `suggest.ts`.
+- [x] Adapt `types.ts`, `output.ts`, `parser.ts`, `blocking-stdio.ts` → `src/cli/`. Optional `prompt.ts`, `suggest.ts` (added when needed).
 - [ ] Write new `src/cli/main.ts` (~250 lines): parse → dispatch → error handling. **No startup side effects.**
 - [ ] Commands registry (~40 lines) + commands: `run`, `plan`, `status`, `show`, `list`, `approve`, `cancel`, `config`, `doctor`, `cost`, `version`.
 - [ ] `bin/veritas.js` 10-line entry.
 
 **4. Shared + security** (§4, §5)
-- [ ] `src/shared/`: event bus, resilience (retry, circuit breaker, rate limiter, bulkhead), secure ids, `safeJsonParse`.
-- [ ] `src/security/`: path validator (as-is), safe git (hardened), safe executor (exact absolute-path allowlist, explicit env/cwd, no presets), token generator, keychain adapter.
-- [ ] Tests for path escape (`/root` vs `/root-evil`, symlinks), executor rejects `/tmp/evil/git`, git hardening flags present.
+- [x] `src/shared/`: `runProcess` (argv-only spawn, timeout + group kill, output cap), env allowlist, ids, atomic fs writes, `safeJsonParse`. *(Event bus: small typed emitter in the engine instead of the generic one. Retry/circuit-breaker/rate-limiter/bulkhead deferred until a consumer needs them.)*
+- [x] `src/security/`: path validator, safe git (hardened, subcommand allowlist), safe executor (exact absolute-path allowlist, no presets). *(Token generator and keychain adapter deferred to M5 where authentication needs them.)*
+- [x] Tests for path escape (`/root` vs `/root-evil`, symlinks), executor rejects `/tmp/evil/git`, git hardening flags present, real repo with malicious fsmonitor config.
 
 **5. Storage** (D2)
 - [ ] `src/storage/db.ts` on `node:sqlite` (`DatabaseSync`), WAL, foreign keys, numbered migrations, repositories for tasks/subtasks/events/approvals.
