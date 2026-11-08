@@ -189,7 +189,7 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 ### M2 tasks
 
 **1. Clarifier** (`src/clarify/`)
-- [ ] Clarifier agent (sonnet, no tools) returns `{questions:[{id, text, options[], default}], assumptions[]}` or `{ready:true}`; CLI asks with defaults; answers + assumptions stored on the task and shown in the result.
+- [x] Clarifier agent (sonnet, no tools) returns `{questions:[{id, text, options[], default}], assumptions[]}` or `{ready:true}`; CLI asks with defaults; answers + assumptions stored on the task and shown in the result.
 
 **2. Web fetch tool** (§7, `src/tools/web-fetch.ts`)
 - [ ] Adapt fetch with SSRF fixes: DNS resolve all A/AAAA + block private/link-local/reserved ranges (full list in notes), pin the resolved IP, `redirect:'manual'` with per-hop re-validation (max 5), byte cap, timeout, content-type allowlist (html, text, pdf, json).
