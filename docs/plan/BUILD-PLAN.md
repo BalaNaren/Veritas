@@ -134,8 +134,8 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [x] Tests for path escape (`/root` vs `/root-evil`, symlinks), executor rejects `/tmp/evil/git`, git hardening flags present, real repo with malicious fsmonitor config.
 
 **5. Storage** (D2)
-- [ ] `src/storage/db.ts` on `node:sqlite` (`DatabaseSync`), WAL, foreign keys, numbered migrations, repositories for tasks/subtasks/events/approvals.
-- [ ] Data dir resolution (`VERITAS_HOME` override → `~/.veritas`), created `0o700`; files `0o600`.
+- [x] `src/storage/db.ts` on `node:sqlite` (`DatabaseSync`), WAL, foreign keys, numbered migrations, repositories for tasks/subtasks/events/approvals.
+- [x] Data dir resolution (`VERITAS_HOME` override → `~/.veritas`), created `0o700`; files `0o600`.
 
 **6. Agent launcher — mode A** (§2)
 - [ ] `src/agents/claude-code.ts`: resolve `claude` binary (adapt `resolveClaudeLaunchCommand`), `runClaude({prompt, cwd, model, allowedTools, permissionMode, jsonSchema, maxBudgetUsd, appendSystemPrompt, timeoutMs, signal})`.
