@@ -138,14 +138,14 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [x] Data dir resolution (`VERITAS_HOME` override → `~/.veritas`), created `0o700`; files `0o600`.
 
 **6. Agent launcher — mode A** (§2)
-- [ ] `src/agents/claude-code.ts`: resolve `claude` binary (adapt `resolveClaudeLaunchCommand`), `runClaude({prompt, cwd, model, allowedTools, permissionMode, jsonSchema, maxBudgetUsd, appendSystemPrompt, timeoutMs, signal})`.
+- [x] `src/agents/claude-code.ts`: resolve `claude` binary (adapt `resolveClaudeLaunchCommand`), `runClaude({prompt, cwd, model, allowedTools, permissionMode, jsonSchema, maxBudgetUsd, appendSystemPrompt, timeoutMs, signal})`.
   - argv: `-p --output-format json --no-session-persistence --model <m> --permission-mode dontAsk [--allowed-tools …] [--json-schema …] [--max-budget-usd …] [--append-system-prompt …]`; prompt on **stdin** only.
   - env allowlist: `PATH, HOME, USER, LANG, TERM, TMPDIR, SHELL, CLAUDE_CONFIG_DIR, ANTHROPIC_*` (no full `process.env`).
   - `detached` process group; timeout → SIGTERM group → SIGKILL after 5 s; stdout capped (e.g. 10 MB).
   - Parse envelope (adapt `parseClaudePrintJsonEnvelope`) → `{ok, text, json, costUsd, inputTokens, outputTokens, durationMs, raw}`.
-- [ ] `src/agents/provider.ts`: `interface ModelProvider { run(req): Promise<RunResult> }` — mode A implements it; mode B added in M5.
-- [ ] `src/agents/models.ts`: role → model alias map (planner/writer: `opus`, worker: `sonnet`, checker: `haiku`), overridable in config.
-- [ ] Tests with a **fake `claude` binary** (a node script on PATH in the test env) covering success, error envelope, timeout kill, oversized output, invalid JSON.
+- [x] `src/agents/provider.ts`: `interface ModelProvider { run(req): Promise<RunResult> }` — mode A implements it; mode B added in M5.
+- [x] `src/agents/models.ts`: role → model alias map (planner/writer: `opus`, worker: `sonnet`, checker: `haiku`), overridable in config.
+- [x] Tests with a **fake `claude` binary** (a node script on PATH in the test env) covering success, error envelope, timeout kill, oversized output, invalid JSON.
 
 **7. Engine**
 - [ ] `src/engine/task-manager.ts`: create/load/transition tasks (state machine above), pause/resume/cancel.
