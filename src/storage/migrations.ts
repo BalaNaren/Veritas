@@ -69,4 +69,45 @@ export const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX idx_approvals_task ON approvals(task_id, status);
   `,
+  // 2: evidence (sources and claims)
+  `
+  CREATE TABLE sources (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    final_url TEXT NOT NULL,
+    title TEXT,
+    kind TEXT NOT NULL DEFAULT 'web',
+    fetched_at TEXT NOT NULL,
+    content_type TEXT,
+    bytes INTEGER NOT NULL,
+    sha256 TEXT NOT NULL,
+    text_sha256 TEXT NOT NULL,
+    snapshot_path TEXT NOT NULL,
+    published_at TEXT,
+    quality TEXT NOT NULL DEFAULT 'unrated',
+    quality_reason TEXT,
+    UNIQUE (task_id, final_url)
+  );
+  CREATE INDEX idx_sources_task ON sources(task_id);
+  CREATE TABLE claims (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    subtask_id TEXT,
+    seq INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    type TEXT NOT NULL,
+    url TEXT,
+    quote TEXT,
+    important INTEGER NOT NULL DEFAULT 0,
+    source_id TEXT REFERENCES sources(id) ON DELETE SET NULL,
+    quote_start INTEGER,
+    quote_end INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',
+    checks TEXT NOT NULL DEFAULT '[]',
+    reason TEXT,
+    UNIQUE (task_id, seq)
+  );
+  CREATE INDEX idx_claims_task ON claims(task_id, status);
+  `,
 ];

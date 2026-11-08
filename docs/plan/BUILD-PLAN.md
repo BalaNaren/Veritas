@@ -192,17 +192,17 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [x] Clarifier agent (sonnet, no tools) returns `{questions:[{id, text, options[], default}], assumptions[]}` or `{ready:true}`; CLI asks with defaults; answers + assumptions stored on the task and shown in the result.
 
 **2. Web fetch tool** (§7, `src/tools/web-fetch.ts`)
-- [ ] Adapt fetch with SSRF fixes: DNS resolve all A/AAAA + block private/link-local/reserved ranges (full list in notes), pin the resolved IP, `redirect:'manual'` with per-hop re-validation (max 5), byte cap, timeout, content-type allowlist (html, text, pdf, json).
-- [ ] `src/tools/extract.ts`: HTML → readable text (pinned `@mozilla/readability` + `linkedom`, or a small in-house extractor), PDF text via `pdfjs-dist` (pinned). Store snapshot text + sha256 in `~/.veritas/tasks/<id>/sources/`.
-- [ ] Tests: SSRF table (`127.0.0.1`, `[::ffff:127.0.0.1]`, `[fd00::1]`, `169.254.169.254`, `localhost.`, decimal/octal IPv4, redirect to private), extraction fixtures.
+- [x] Adapt fetch with SSRF fixes: DNS resolve all A/AAAA + block private/link-local/reserved ranges (full list in notes), pin the resolved IP, `redirect:'manual'` with per-hop re-validation (max 5), byte cap, timeout, content-type allowlist (html, text, pdf, json).
+- [x] `src/tools/extract.ts`: HTML → readable text (small in-house extractor, no dependencies; deterministic). Snapshot text + sha256 stored in `~/.veritas/tasks/<id>/sources/` by the evidence store. *(PDF text via `pdfjs-dist` moves to M3 with the document readers; until then PDFs are refused as an unsupported content type.)*
+- [x] Tests: SSRF table (`127.0.0.1`, `[::ffff:127.0.0.1]`, `[fd00::1]`, `169.254.169.254`, `localhost.`, decimal/octal IPv4, redirect to private), extraction fixtures.
 
 **3. Research agents** (`src/research/`)
 - [ ] Research subtask = `claude -p` with `--allowed-tools WebSearch WebFetch`, `--json-schema` for findings: `{findings:[{claim, type:"fact|number|quote", url, title, quote, publishedAt?}], notes}`. Instructions: only claims backed by an exact quote from a page actually read.
 - [ ] Planner prompt for research: split topic into 3–6 sub-questions.
 
 **4. Evidence store** (`src/evidence/`)
-- [ ] Tables `sources`, `claims`; every finding's URL is **re-fetched by Veritas itself** (web-fetch tool) — the agent's fetch is not trusted.
-- [ ] Source quality labeling: rules (gov/edu/official domains, filings → primary; known reputable outlets → secondary; else low) + checker-agent fallback; recency check for fast-changing figures.
+- [x] Tables `sources`, `claims` (migration 2, `src/evidence/`); every finding's URL is **re-fetched by Veritas itself** (web-fetch tool) — the agent's fetch is not trusted.
+- [x] Source quality labeling by domain rules (`primary` / `secondary` / `unrated`; "unrated" means not on the recognised lists, not "bad") and `ageInDays` helper. *(Checker-agent fallback for unrated sources and the recency flag on fast-changing figures are applied in the verifier.)*
 
 **5. Verifier** (`src/verify/`) — PRODUCT.md §10.3
 - [ ] Step 1 *source exists* (code): source fetched in this task and stored.
