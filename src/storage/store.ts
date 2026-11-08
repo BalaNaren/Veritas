@@ -85,6 +85,7 @@ export interface TaskPatch {
 
 export interface SubtaskPatch {
   status?: SubtaskStatus;
+  model?: string | null;
   startedAt?: string | null;
   finishedAt?: string | null;
   costUsd?: number;
@@ -217,7 +218,7 @@ export class Store {
 
   updateSubtask(id: string, patch: SubtaskPatch): SubtaskRow {
     const { sql, params } = setClause(patch as Record<string, unknown>, {
-      status: { col: 'status' }, startedAt: { col: 'started_at' }, finishedAt: { col: 'finished_at' },
+      status: { col: 'status' }, model: { col: 'model' }, startedAt: { col: 'started_at' }, finishedAt: { col: 'finished_at' },
       costUsd: { col: 'cost_usd' }, inputTokens: { col: 'input_tokens' }, outputTokens: { col: 'output_tokens' },
       output: { col: 'output', json: true }, error: { col: 'error' }, attempts: { col: 'attempts' },
     });
@@ -225,6 +226,17 @@ export class Store {
     const row = this.getSubtask(id);
     if (!row) throw new Error(`Subtask not found: ${id}`);
     return row;
+  }
+
+  /** Measured average cost per model across finished subtasks (for cost estimates). */
+  averageSubtaskCostByModel(): Record<string, { average: number; samples: number }> {
+    const rows = this.db.prepare(
+      `SELECT model, AVG(cost_usd) AS average, COUNT(*) AS samples FROM subtasks
+       WHERE status = 'done' AND model IS NOT NULL AND cost_usd > 0 GROUP BY model`,
+    ).all() as Row[];
+    const out: Record<string, { average: number; samples: number }> = {};
+    for (const r of rows) out[r.model as string] = { average: r.average as number, samples: r.samples as number };
+    return out;
   }
 
   deleteSubtasks(taskId: string): void {

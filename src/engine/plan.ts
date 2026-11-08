@@ -15,8 +15,10 @@ export interface PlannedSubtask {
 
 export interface Plan {
   subtasks: PlannedSubtask[];
-  /** Estimated total cost range in USD. */
+  /** Estimated cost range in USD for running the tasks, computed by Veritas (not by the planner). */
   estimateUsd: { low: number; high: number };
+  /** Whether the estimate comes from measured past runs or from built-in defaults. */
+  estimateBasis: 'history' | 'defaults';
   /** Assumptions the planner made, shown to the user. */
   assumptions: string[];
 }
