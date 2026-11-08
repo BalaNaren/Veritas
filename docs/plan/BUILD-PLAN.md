@@ -13,7 +13,7 @@ Some building blocks are adapted from existing MIT-licensed code (permission obt
 
 | # | Decision | Reason | Doc impact |
 |---|---|---|---|
-| D1 | **Model access mode A is the default:** Veritas launches headless Claude Code (`claude -p`) per agent, using the user's existing Claude Code login. **Mode B** (Anthropic API key, `@anthropic-ai/sdk`) is added in M5 for the hosted service and users without Claude Code. | No API key needed for local users; test with real runs immediately. Hosted service must not route personal subscriptions. | Update PRODUCT.md §9 (model layer) and §12 (deployment) after M1. |
+| D1 | **Model access mode A is the default:** Veritas launches headless Claude Code (`claude -p`) per agent, using the user's existing Claude Code login. **Mode B** (Anthropic API key, `@anthropic-ai/sdk`) is added in M5 for the hosted service and users without Claude Code. | No API key needed for local users; test with real runs immediately. Hosted service must not route personal subscriptions. | PRODUCT.md §9 and §12 updated after M1. |
 | D2 | **Storage uses Node's built-in `node:sqlite`** (Node ≥ 22.13; verified on Node 24 with FTS5). No native modules, no WASM. | Zero dependencies; full-text search built in. | §9.5 unchanged in spirit. |
 | D3 | **Node ≥ 22.13, TypeScript, ESM** (`module/moduleResolution: NodeNext`), `tsc` build, **vitest** tests. | Matches adapted code; `node:sqlite` requirement. | — |
 | D4 | **Data-analysis sandbox (M3):** Docker if installed; otherwise macOS `sandbox-exec` profile (no network, writes only inside a temp dir); otherwise data analysis is disabled with a clear message. | Docker is not installed on the dev machine. | §11.3 — add the macOS fallback. |
@@ -158,7 +158,7 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [x] Per-run cost from the envelope; accumulate per subtask and task; `cost.updated` events.
 - [x] Budget enforcement: pass remaining budget as `--max-budget-usd` to each agent; scheduler stops dispatching and pauses the task at 100%; asks approval to continue (policy gate).
 - [x] `veritas cost` report (by task / day / model) from the DB. Optional: transcript ledger (adapted `claudeRows` with dedupe) for cross-checking.
-- [ ] Price book only used for **estimates** (re-verify rates; mark `priced:false` for unknown models).
+- [x] No price book: estimates come from default per-model figures until measured runs exist, and are labelled as defaults or history. Real costs always come from the runtime's own report.
 
 **9. Policy & approvals** (§13)
 - [x] Adapt policy core (types, evaluator, engine) → `src/policy/`, **default mode `enforce`, default-deny** for risky actions.
@@ -166,7 +166,7 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [x] CLI prompt for approvals when interactive; `veritas approve <id>` when not. AI can never approve.
 
 **10. CLI experience**
-- [x] `veritas run "<goal>" [--budget 2] [--yes-plan] [--model-*]`: shows plan + estimate → approve → live progress table (subtasks, status, cost so far) → summary.
+- [x] `veritas run "<goal>" [--budget 2] [--yes-plan]` (models are set with `veritas config set models.<role> <alias>`): shows plan + estimate → approve → live progress table (subtasks, status, cost so far) → summary.
 - [x] `veritas show <task>`: full record (plan, events, costs, outputs). `veritas list`, `veritas status`.
 - [x] `veritas doctor`: checks Node version, `claude` found + logged in (cheap probe), data dir permissions.
 

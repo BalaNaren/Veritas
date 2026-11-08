@@ -7,7 +7,7 @@ Veritas is an open-source (Apache-2.0) AI task agent: give it a goal, a planner 
 - Private build notes (which existing MIT files to adapt, with file:line fixes): `../veritas-build-notes/SOURCE-MAP.md` — **outside this repo; never copy that file or its contents' project names into the repo.**
 
 ## Current status
-Planning complete; no code yet. **Next step: M1, task 1 (repo bootstrap) then task 2 (claude -p spike).** Work through the M1 checklist in order and tick items in BUILD-PLAN.md as they are done.
+**M1 (engine) is complete** and committed: CLI (`run`, `plan`, `approve`, `resume`, `cancel`, `list`, `status`, `show`, `cost`, `config`, `doctor`), planner, scheduler (dependencies, parallelism, retries, budget pause, cancel), approvals/policy, SQLite storage, cost tracking. Verified with the fake runtime in tests and with live smoke runs on a real Claude login. **Verification of claims does not exist yet** — do not describe it as working until M2 ships. **Next step: M2 (research reports)** per `docs/plan/BUILD-PLAN.md`; start with the clarifier, then web fetch with SSRF protection.
 
 ## Non-negotiable rules
 1. **No references to the upstream project** anywhere in this repo: code, comments, docs, commit messages, package names, env vars (`VERITAS_*` only), paths (`.veritas/`), branch prefixes (`veritas/`). Run `npm run clean-check` (added in M1) before every commit.

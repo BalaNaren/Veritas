@@ -415,7 +415,7 @@ At any point the user can:
 | **Memory** | Stores past tasks, sources and preferences for reuse; user-controlled and deletable |
 
 ### 9.3 Model layer
-Veritas v1 uses Claude models through Anthropic's official TypeScript SDK. Each role uses the model that fits it:
+Veritas v1 uses Claude models. In local mode each agent runs as a headless Claude Code session on the user's existing Claude Code login, so no API key is needed. An Anthropic API key mode (through Anthropic's official TypeScript SDK) is for the hosted service and for people without Claude Code. Each role uses the model that fits it:
 
 | Role | Model | Why |
 |---|---|---|
@@ -449,7 +449,7 @@ These assignments are a starting point. They will be tuned with measurements of 
 | Area | Choice |
 |---|---|
 | Language | TypeScript (Node.js) |
-| AI | Anthropic TypeScript SDK (`@anthropic-ai/sdk`) · Claude Agent SDK for coding tasks |
+| AI | Headless Claude Code (`claude -p`) on the user's login in local mode · Anthropic TypeScript SDK (`@anthropic-ai/sdk`) with an API key for hosted mode and users without Claude Code |
 | CLI | Node.js command-line app, distributed through npm |
 | Local storage | SQLite |
 | Code sandbox | Docker (local) · Anthropic code execution (hosted) |
@@ -634,11 +634,11 @@ Veritas runs in two modes powered by the same engine: **local** and **hosted**. 
 | | **Local** | **Hosted** |
 |---|---|---|
 | Where it runs | The user's own computer | Veritas cloud |
-| AI access | User's own Anthropic API key | Included in the Veritas subscription (Veritas key) |
-| Cost | Free software; user pays Anthropic directly for AI usage | Monthly subscription with usage limits |
+| AI access | User's own Claude Code login (or their own Anthropic API key) | Included in the Veritas subscription (Veritas key) |
+| Cost | Free software; AI usage counts against the user's own Claude plan or API account | Monthly subscription with usage limits |
 | Where data lives | Only on the user's machine | Veritas cloud, encrypted and isolated per user |
 | Code sandbox | Docker on the user's machine | Anthropic's code execution environment |
-| Setup | Install the CLI, add an API key, optionally install Docker | Sign up and log in; nothing else to install |
+| Setup | Install the CLI and Claude Code and log in, optionally install Docker | Sign up and log in; nothing else to install |
 | Best for | Privacy-conscious users, developers, people who already have an API key | Anyone who wants it to just work, and teams |
 
 ### 12.2 Local mode
@@ -647,14 +647,14 @@ Veritas runs in two modes powered by the same engine: **local** and **hosted**. 
 ```
 $ npm install -g veritas@1.0.0     # exact, pinned version
 $ veritas setup                    # guided setup
-  → Enter your Anthropic API key (stored in your OS keychain)
+  → Claude Code found and logged in ✓  (or enter an Anthropic API key, stored in your OS keychain)
   → Docker found ✓  (data analysis enabled)
   → Set a default budget per task: $2.00
 ```
 
 **Requirements:**
 - Node.js (a current long-term-support version)
-- An Anthropic API key
+- Claude Code, logged in (or an Anthropic API key)
 - Docker, optional but required for data analysis. Without it, research, document analysis and coding still work.
 - Git, for coding tasks
 
