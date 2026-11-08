@@ -76,6 +76,7 @@ export interface NewSubtask {
 
 export interface TaskPatch {
   status?: TaskStatus;
+  type?: string;
   plan?: Plan | null;
   assumptions?: string[];
   resultPath?: string | null;
@@ -183,7 +184,7 @@ export class Store {
 
   updateTask(id: string, patch: TaskPatch): TaskRow {
     const { sql, params } = setClause(patch as Record<string, unknown>, {
-      status: { col: 'status' }, plan: { col: 'plan', json: true }, assumptions: { col: 'assumptions', json: true },
+      status: { col: 'status' }, type: { col: 'type' }, plan: { col: 'plan', json: true }, assumptions: { col: 'assumptions', json: true },
       resultPath: { col: 'result_path' }, error: { col: 'error' }, budgetUsd: { col: 'budget_usd' },
     });
     this.db.prepare(`UPDATE tasks SET ${sql ? sql + ', ' : ''}updated_at = ? WHERE id = ?`).run(...params, now(), id);

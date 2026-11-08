@@ -10,6 +10,9 @@ export function describeEvent(out: OutputFormatter, e: EventRow, verbose = false
   switch (e.type) {
     case 'clarify.started': return out.dim('Checking the goal...');
     case 'clarify.skipped': return out.dim('Could not check the goal for questions; continuing.');
+    case 'source.failed': return `  ${out.warning('could not fetch')} ${x.url} ${out.dim(String(x.message))}`;
+    case 'verify.started': return out.dim('Collecting sources and checking every claim...');
+    case 'verify.done': return out.dim(`Checked: ${x.confirmed} confirmed, ${x.flagged} flagged, ${x.removed} removed${Number(x.notChecked) ? `, ${x.notChecked} not checked` : ''}`);
     case 'plan.started': return out.dim('Planning...');
     case 'plan.created': return out.dim(`Plan ready: ${x.tasks} task${x.tasks === 1 ? '' : 's'}`);
     case 'plan.failed': return out.error(`Planning failed: ${x.error}`);

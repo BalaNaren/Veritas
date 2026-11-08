@@ -214,9 +214,9 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [x] Prompt-injection hardening: source text wrapped as data with explicit delimiters; checker has no tools.
 
 **6. Writer / assembler** (`src/write/`)
-- [ ] Writer agent (opus, no tools) receives only verified/flagged claims with IDs; must cite `[c<ID>]` for every factual statement; analysis sentences marked.
-- [ ] Post-check (code): every sentence with a number/named fact references a claim ID; unreferenced factual sentences are sent back once, then removed or labeled analysis.
-- [ ] Renderers: Markdown (citations → numbered footnotes with URL + quote), DOCX (pinned `docx`), PDF (pinned `pdfmake`); verification summary appended; "Assumptions" at top.
+- [x] Writer agent (opus, no tools) receives only verified/flagged claims with IDs; must cite `[c<ID>]` for every factual statement; analysis sentences marked.
+- [x] Post-check (code): every sentence with a number/named fact references a claim ID; unreferenced factual sentences are sent back once, then removed or labeled analysis.
+- [~] Renderers: Markdown done (citations → numbered sources with URL + quote, verification summary appended, "Assumptions" at top). DOCX (pinned `docx`) and PDF (pinned `pdfmake`) still to do.
 
 **7. Golden verification set** (`test/golden/`)
 - [ ] ~50 research questions + ~200 hand-labeled claims (supported / unsupported / contradicted, incl. deliberately wrong numbers and fake quotes) with stored source snapshots (offline).

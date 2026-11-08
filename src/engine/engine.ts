@@ -13,6 +13,10 @@ import { EventLog } from './event-log.js';
 import { answersToStatements, clarifyGoal, type ClarifyQuestion } from '../clarify/clarifier.js';
 import { planGoal } from './planner.js';
 import { runSubtasks } from './scheduler.js';
+import { finishResearch } from './research-pipeline.js';
+import { fetchUrl } from '../tools/web-fetch.js';
+import type { Fetcher } from '../research/ingest.js';
+import type { Checker } from '../verify/checker.js';
 
 /** What the person at the keyboard decided. `defer` means "ask me later" (`veritas approve`). */
 export type Decision = 'approved' | 'denied' | 'defer';
@@ -24,6 +28,10 @@ export interface EngineOptions {
   config: VeritasConfig;
   policy?: Policy;
   events?: EventLog;
+  /** Fetches pages cited by research agents. Defaults to the strict public-internet fetcher. */
+  fetcher?: Fetcher;
+  /** Replaces the AI checker (tests). */
+  checker?: Checker;
   /** Delay before retrying a failed agent (tests set 0). */
   retryDelayMs?: number;
 }
@@ -59,6 +67,8 @@ export class Engine {
   private readonly config: VeritasConfig;
   private readonly policy: Policy;
   private readonly retryDelayMs?: number;
+  private readonly fetcher: Fetcher;
+  private readonly checker?: Checker;
 
   constructor(opts: EngineOptions) {
     this.store = opts.store;
@@ -67,6 +77,8 @@ export class Engine {
     this.policy = opts.policy ?? new Policy();
     this.events = opts.events ?? new EventLog(opts.store);
     this.retryDelayMs = opts.retryDelayMs;
+    this.fetcher = opts.fetcher ?? fetchUrl;
+    this.checker = opts.checker;
   }
 
   createTask(goal: string, opts: NewTaskOptions = {}): TaskRow {
@@ -183,7 +195,10 @@ export class Engine {
     this.store.transaction(() => {
       this.store.deleteSubtasks(task.id);
       this.store.createSubtasks(task.id, plan.subtasks);
-      this.store.updateTask(task.id, { status: 'planned', plan, assumptions: plan.assumptions });
+      this.store.updateTask(task.id, {
+        status: 'planned', plan, assumptions: plan.assumptions,
+        type: plan.subtasks.every((s) => s.kind === 'research') ? 'research' : 'general',
+      });
     });
     this.events.emit(task.id, 'plan.created', {
       tasks: plan.subtasks.length, estimateUsd: plan.estimateUsd, estimateBasis: plan.estimateBasis, costUsd: outcome.costUsd,
@@ -260,8 +275,27 @@ export class Engine {
         this.events.emit(task.id, 'task.paused', { reason: 'budget' });
         return { task: this.store.updateTask(task.id, { status: 'paused' }) };
       }
-      return this.finish(this.require(task.id));
+      const finished = this.require(task.id);
+      if (finished.type === 'research') return this.finishResearchTask(finished, signal);
+      return this.finish(finished);
     }
+  }
+
+  private async finishResearchTask(task: TaskRow, signal?: AbortSignal): Promise<ExecuteResult> {
+    const outcome = await finishResearch({
+      store: this.store, events: this.events, provider: this.provider, config: this.config, fetcher: this.fetcher, checker: this.checker,
+    }, task, signal);
+    if (outcome.status === 'interrupted') {
+      this.events.emit(task.id, 'task.interrupted');
+      return { task: this.store.updateTask(task.id, { status: 'paused' }) };
+    }
+    if (outcome.status === 'failed') {
+      this.events.emit(task.id, 'task.failed', { error: outcome.error });
+      return { task: this.store.updateTask(task.id, { status: 'failed', error: outcome.error }) };
+    }
+    const done = this.store.updateTask(task.id, { status: 'done', resultPath: outcome.resultPath });
+    this.events.emit(task.id, 'task.done', { resultPath: outcome.resultPath, spentUsd: done.spentUsd });
+    return { task: done, resultPath: outcome.resultPath };
   }
 
   private finish(task: TaskRow): ExecuteResult {
