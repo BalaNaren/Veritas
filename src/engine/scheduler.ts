@@ -6,6 +6,7 @@ import type { Store } from '../storage/store.js';
 import type { SubtaskRow, TaskRow } from '../storage/models.js';
 import type { EventLog } from './event-log.js';
 import { getKind } from './kinds.js';
+import { tryJsonParse } from '../shared/json.js';
 import { goalWithContext, workerPrompt, type DependencyResult } from './prompts.js';
 
 export type RunOutcome =
@@ -67,7 +68,7 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
       const d = byKey.get(k)!;
       return { key: d.key, title: d.title, text: typeof d.output === 'string' ? d.output : JSON.stringify(d.output ?? '') };
     });
-    const prompt = workerPrompt(goalWithContext(task.goal, task.assumptions), s, deps);
+    const prompt = workerPrompt(goalWithContext(task.goal, task.assumptions), s, deps, kind.guidance);
 
     store.updateSubtask(s.id, { status: 'running', startedAt: new Date().toISOString(), model });
     events.emit(task.id, 'subtask.started', { key: s.key, title: s.title, model }, s.id);
@@ -81,8 +82,8 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
     while (attempt < maxAttempts) {
       attempt++;
       store.updateSubtask(s.id, { attempts: attempt });
-      const res: AgentRunResult = await provider.run({
-        prompt, model, cwd: task.cwd, tools: kind.tools, allowedTools: kind.allowedTools,
+      let res: AgentRunResult = await provider.run({
+        prompt, model, cwd: task.cwd, tools: kind.tools, allowedTools: kind.allowedTools, jsonSchema: kind.outputSchema,
         maxBudgetUsd: currentCap, timeoutMs: opts.config.agentTimeoutMs, signal,
       });
       totalCost += res.costUsd;
@@ -91,8 +92,16 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
       budget.settle(s.id, res.costUsd);
       emitCost();
 
+      // Structured kinds must return valid JSON; a bad answer counts as a failed attempt so it is retried.
+      let output: unknown = res.text;
+      if (res.ok && kind.outputSchema) {
+        output = res.json ?? tryJsonParse(res.text);
+        const problem = kind.validateOutput?.(output) ?? (output === undefined ? 'The agent did not return JSON.' : null);
+        if (problem) res = { ...res, ok: false, error: { kind: 'agent_error', message: `Invalid result: ${problem}` } };
+      }
+
       if (res.ok) {
-        store.updateSubtask(s.id, { status: 'done', finishedAt: new Date().toISOString(), output: res.text, error: null });
+        store.updateSubtask(s.id, { status: 'done', finishedAt: new Date().toISOString(), output, error: null });
         events.emit(task.id, 'subtask.finished', { key: s.key, costUsd: totalCost, attempts: attempt }, s.id);
         return;
       }

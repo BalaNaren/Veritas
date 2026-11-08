@@ -89,6 +89,10 @@ export function validatePlanDraft(value: unknown, limits: PlanLimits): PlanValid
     }
   }
   if (!errors.length && hasCycle(subtasks)) errors.push('The tasks depend on each other in a circle.');
+  const researchCount = subtasks.filter((x) => x.kind === 'research').length;
+  if (researchCount && researchCount !== subtasks.length) {
+    errors.push('A plan that uses research tasks must use only research tasks (Veritas writes the final report itself from the checked findings).');
+  }
 
   const assumptionsRaw = value.assumptions ?? [];
   let assumptions: string[] = [];

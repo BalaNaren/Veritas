@@ -67,6 +67,16 @@ switch (mode) {
     print(envelope({ result: JSON.stringify(plan), structured_output: plan }));
     break;
   }
+  case 'findings': {
+    // Research agent: one finding about the page named in the directive.
+    const url = arg || 'https://example.com/page';
+    const out = { findings: [{ claim: 'The Moon is about 384,400 km from Earth.', type: 'number', url, title: 'Moon facts', quote: 'average distance of 384,400 km', important: true }], notes: '' };
+    print(envelope({ result: JSON.stringify(out), structured_output: out, total_cost_usd: 0.02 }));
+    break;
+  }
+  case 'badfindings':
+    print(envelope({ result: '{"findings":"nope"}', structured_output: { findings: 'nope' } }));
+    break;
   case 'ask': {
     // Schema-aware: answers the clarifier with two questions and the planner with a plan.
     const schema = flag('--json-schema') ?? '';

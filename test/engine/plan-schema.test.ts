@@ -40,3 +40,14 @@ describe('validatePlanDraft', () => {
     expect(JSON.stringify(planJsonSchema(limits))).toContain('"enum":["general"]');
   });
 });
+
+describe('research plans', () => {
+  const lim = { maxSubtasks: 6, kinds: ['general', 'research'] };
+  const r = (key: string) => ({ key, title: key, kind: 'research', instructions: 'x', dependsOn: [] });
+  it('accepts research-only plans and rejects mixing with other kinds', () => {
+    expect(validatePlanDraft({ subtasks: [r('a'), r('b')], assumptions: [] }, lim).ok).toBe(true);
+    const mixed = validatePlanDraft({ subtasks: [r('a'), { ...r('b'), kind: 'general' }], assumptions: [] }, lim);
+    expect(mixed.ok).toBe(false);
+    if (!mixed.ok) expect(mixed.errors.join(' ')).toMatch(/only research tasks/);
+  });
+});

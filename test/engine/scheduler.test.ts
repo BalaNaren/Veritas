@@ -88,3 +88,22 @@ describe('runSubtasks', () => {
     expect(await t.run()).toEqual({ status: 'done' });
   });
 });
+
+describe('structured worker kinds', () => {
+  const research = (key: string, instructions: string): NewSubtask => ({ key, title: key, kind: 'research', instructions, dependsOn: [] });
+
+  it('stores the agent\'s JSON as the output and passes the schema and tools', async () => {
+    const t = setup([research('r1', '[[fake:findings:https://www.nasa.gov/moon]]')]);
+    expect(await t.run()).toEqual({ status: 'done' });
+    const out = t.subs().r1!.output as { findings: { url: string }[] };
+    expect(out.findings[0]!.url).toBe('https://www.nasa.gov/moon');
+  });
+
+  it('treats invalid structured output as a failed attempt and retries, then fails', async () => {
+    const t = setup([research('r1', '[[fake:badfindings]]')]);
+    const r = await t.run();
+    expect(r.status).toBe('failed');
+    expect(t.subs().r1!.attempts).toBe(2);
+    expect(t.subs().r1!.error).toMatch(/Invalid result/);
+  });
+});

@@ -197,8 +197,8 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [x] Tests: SSRF table (`127.0.0.1`, `[::ffff:127.0.0.1]`, `[fd00::1]`, `169.254.169.254`, `localhost.`, decimal/octal IPv4, redirect to private), extraction fixtures.
 
 **3. Research agents** (`src/research/`)
-- [ ] Research subtask = `claude -p` with `--allowed-tools WebSearch WebFetch`, `--json-schema` for findings: `{findings:[{claim, type:"fact|number|quote", url, title, quote, publishedAt?}], notes}`. Instructions: only claims backed by an exact quote from a page actually read.
-- [ ] Planner prompt for research: split topic into 3–6 sub-questions.
+- [x] Research subtask = `claude -p` with `--allowed-tools WebSearch WebFetch`, `--json-schema` for findings: `{findings:[{claim, type:"fact|number|quote", url, title, quote, publishedAt?}], notes}`. Instructions: only claims backed by an exact quote from a page actually read.
+- [x] Planner prompt for research: split topic into 3–6 sub-questions. *(A plan with research tasks may contain only research tasks; Veritas writes the final report itself.)*
 
 **4. Evidence store** (`src/evidence/`)
 - [x] Tables `sources`, `claims` (migration 2, `src/evidence/`); every finding's URL is **re-fetched by Veritas itself** (web-fetch tool) — the agent's fetch is not trusted.
