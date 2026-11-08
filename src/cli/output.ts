@@ -52,16 +52,22 @@ type ColorName = keyof typeof COLORS;
 
 export type VerbosityLevel = 'quiet' | 'normal' | 'verbose' | 'debug';
 
+/** Anything text can be written to: a terminal stream, or a buffer in tests. */
+export interface TextStream {
+  write(text: string): unknown;
+  isTTY?: boolean;
+}
+
 export class OutputFormatter {
   private colorEnabled: boolean;
-  private outputStream: NodeJS.WriteStream;
-  private errorStream: NodeJS.WriteStream;
+  private outputStream: TextStream;
+  private errorStream: TextStream;
   private verbosity: VerbosityLevel;
 
-  constructor(options: { color?: boolean; verbosity?: VerbosityLevel } = {}) {
+  constructor(options: { color?: boolean; verbosity?: VerbosityLevel; stdout?: TextStream; stderr?: TextStream } = {}) {
     this.colorEnabled = options.color ?? this.supportsColor();
-    this.outputStream = process.stdout;
-    this.errorStream = process.stderr;
+    this.outputStream = options.stdout ?? process.stdout;
+    this.errorStream = options.stderr ?? process.stderr;
     this.verbosity = options.verbosity ?? 'normal';
   }
 

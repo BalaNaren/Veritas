@@ -10,7 +10,7 @@ import type { AgentError, AgentRunRequest, AgentRunResult, ModelProvider } from 
  * Veritas uses the Claude Code login on this machine, not an API key from the
  * environment. Add names through `extraEnvNames` when you need more.
  */
-const AGENT_ENV_NAMES = [
+export const AGENT_ENV_NAMES = [
   ...BASE_ENV_NAMES,
   'CLAUDE_CONFIG_DIR', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY', 'https_proxy', 'http_proxy', 'no_proxy',
   'SSL_CERT_FILE', 'SSL_CERT_DIR', 'NODE_EXTRA_CA_CERTS',

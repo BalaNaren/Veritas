@@ -109,6 +109,13 @@ function setClause(patch: Record<string, unknown>, columns: Record<string, { col
   return { sql: parts.join(', '), params };
 }
 
+export interface CostReport {
+  totalUsd: number;
+  byDay: { day: string; usd: number; tasks: number }[];
+  byTask: { id: string; slug: string; usd: number }[];
+  byModel: { model: string; usd: number; runs: number }[];
+}
+
 export class Store {
   private depth = 0;
 
@@ -237,6 +244,28 @@ export class Store {
     const out: Record<string, { average: number; samples: number }> = {};
     for (const r of rows) out[r.model as string] = { average: r.average as number, samples: r.samples as number };
     return out;
+  }
+
+  /**
+   * Spending summary for `veritas cost`. Totals come from tasks (so they include planning);
+   * the per-model split covers agent runs on tasks only.
+   */
+  costReport(sinceIso?: string): CostReport {
+    const since = sinceIso ?? '0000';
+    const num = (v: unknown): number => Number(v ?? 0);
+    const byDay = (this.db.prepare(
+      `SELECT substr(created_at, 1, 10) AS day, SUM(spent_usd) AS usd, COUNT(*) AS tasks FROM tasks
+       WHERE created_at >= ? GROUP BY day ORDER BY day DESC`).all(since) as Row[])
+      .map((r) => ({ day: r.day as string, usd: num(r.usd), tasks: num(r.tasks) }));
+    const byTask = (this.db.prepare(
+      `SELECT id, slug, spent_usd AS usd FROM tasks WHERE created_at >= ? AND spent_usd > 0 ORDER BY spent_usd DESC LIMIT 10`).all(since) as Row[])
+      .map((r) => ({ id: r.id as string, slug: r.slug as string, usd: num(r.usd) }));
+    const byModel = (this.db.prepare(
+      `SELECT s.model AS model, SUM(s.cost_usd) AS usd, COUNT(*) AS runs FROM subtasks s JOIN tasks t ON t.id = s.task_id
+       WHERE t.created_at >= ? AND s.model IS NOT NULL AND s.cost_usd > 0 GROUP BY s.model ORDER BY usd DESC`).all(since) as Row[])
+      .map((r) => ({ model: r.model as string, usd: num(r.usd), runs: num(r.runs) }));
+    const total = num((this.db.prepare('SELECT SUM(spent_usd) AS usd FROM tasks WHERE created_at >= ?').get(since) as Row).usd);
+    return { totalUsd: total, byDay, byTask, byModel };
   }
 
   deleteSubtasks(taskId: string): void {

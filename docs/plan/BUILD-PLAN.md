@@ -124,9 +124,9 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 
 **3. CLI framework** (§1)
 - [x] Adapt `types.ts`, `output.ts`, `parser.ts`, `blocking-stdio.ts` → `src/cli/`. Optional `prompt.ts`, `suggest.ts` (added when needed).
-- [ ] Write new `src/cli/main.ts` (~250 lines): parse → dispatch → error handling. **No startup side effects.**
-- [ ] Commands registry (~40 lines) + commands: `run`, `plan`, `status`, `show`, `list`, `approve`, `cancel`, `config`, `doctor`, `cost`, `version`.
-- [ ] `bin/veritas.js` 10-line entry.
+- [x] Write new `src/cli/main.ts` (~250 lines): parse → dispatch → error handling. **No startup side effects.**
+- [x] Commands registry (~40 lines) + commands: `run`, `plan`, `status`, `show`, `list`, `approve`, `cancel`, `config`, `doctor`, `cost`, `version`.
+- [x] `bin/veritas.js` 10-line entry.
 
 **4. Shared + security** (§4, §5)
 - [x] `src/shared/`: `runProcess` (argv-only spawn, timeout + group kill, output cap), env allowlist, ids, atomic fs writes, `safeJsonParse`. *(Event bus: small typed emitter in the engine instead of the generic one. Retry/circuit-breaker/rate-limiter/bulkhead deferred until a consumer needs them.)*
@@ -157,18 +157,18 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 **8. Cost & budget** (§12)
 - [x] Per-run cost from the envelope; accumulate per subtask and task; `cost.updated` events.
 - [x] Budget enforcement: pass remaining budget as `--max-budget-usd` to each agent; scheduler stops dispatching and pauses the task at 100%; asks approval to continue (policy gate).
-- [ ] `veritas cost` report (by task / day / model) from the DB. Optional: transcript ledger (adapted `claudeRows` with dedupe) for cross-checking.
+- [x] `veritas cost` report (by task / day / model) from the DB. Optional: transcript ledger (adapted `claudeRows` with dedupe) for cross-checking.
 - [ ] Price book only used for **estimates** (re-verify rates; mark `priced:false` for unknown models).
 
 **9. Policy & approvals** (§13)
 - [x] Adapt policy core (types, evaluator, engine) → `src/policy/`, **default mode `enforce`, default-deny** for risky actions.
 - [x] Approval actions: `plan.start`, `budget.exceed`, (M2+) `network.new_destination`, (M4) `git.commit/push/merge`, `fs.write_outside_output`, `cmd.first_run`.
-- [ ] CLI prompt for approvals when interactive; `veritas approve <id>` when not. AI can never approve.
+- [x] CLI prompt for approvals when interactive; `veritas approve <id>` when not. AI can never approve.
 
 **10. CLI experience**
-- [ ] `veritas run "<goal>" [--budget 2] [--yes-plan] [--model-*]`: shows plan + estimate → approve → live progress table (subtasks, status, cost so far) → summary.
-- [ ] `veritas show <task>`: full record (plan, events, costs, outputs). `veritas list`, `veritas status`.
-- [ ] `veritas doctor`: checks Node version, `claude` found + logged in (cheap probe), data dir permissions.
+- [x] `veritas run "<goal>" [--budget 2] [--yes-plan] [--model-*]`: shows plan + estimate → approve → live progress table (subtasks, status, cost so far) → summary.
+- [x] `veritas show <task>`: full record (plan, events, costs, outputs). `veritas list`, `veritas status`.
+- [x] `veritas doctor`: checks Node version, `claude` found + logged in (cheap probe), data dir permissions.
 
 ### M1 tests
 - Unit: parser, output, security, storage repos, planner validation (cycles, caps), scheduler (deps order, concurrency, retry, cancel), budget stop, policy decisions.

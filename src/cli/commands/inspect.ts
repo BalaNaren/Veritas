@@ -1,0 +1,111 @@
+import { formatUsd } from '../../cost/estimate.js';
+import { TERMINAL_TASK_STATUSES } from '../../storage/models.js';
+import type { App } from '../app.js';
+import { describeEvent } from '../progress.js';
+import { formatPlan, subtaskTable, taskTable, truncate } from '../format.js';
+import { ValidationError, type Command, type CommandResult } from '../types.js';
+import { requireTask } from './run.js';
+
+const ok: CommandResult = { success: true };
+
+export function inspectCommands(app: App): Command[] {
+  const { out } = app.rt;
+  const json = (flags: Record<string, unknown>): boolean => flags.json === true || flags.format === 'json';
+  return [
+    {
+      name: 'list',
+      description: 'Show recent tasks',
+      options: [
+        { name: 'limit', type: 'number', description: 'How many to show (default 20)' },
+        { name: 'json', type: 'boolean', description: 'Machine-readable output' },
+      ],
+      action: async (ctx) => {
+        const limit = ctx.flags.limit === undefined ? 20 : Number(ctx.flags.limit);
+        if (!Number.isInteger(limit) || limit < 1) throw new ValidationError('--limit must be a whole number above 0.');
+        const tasks = app.store.listTasks(limit);
+        if (json(ctx.flags)) out.printJson(tasks);
+        else if (!tasks.length) out.writeln('No tasks yet. Start one with: veritas run "<goal>"');
+        else out.writeln(taskTable(out, tasks));
+        return ok;
+      },
+    },
+    {
+      name: 'status',
+      description: 'Show tasks that are not finished',
+      options: [{ name: 'json', type: 'boolean', description: 'Machine-readable output' }],
+      action: async (ctx) => {
+        const active = app.store.listTasks(200).filter((t) => !TERMINAL_TASK_STATUSES.includes(t.status));
+        if (json(ctx.flags)) out.printJson(active);
+        else if (!active.length) out.writeln('Nothing is running or waiting.');
+        else out.writeln(taskTable(out, active));
+        return ok;
+      },
+    },
+    {
+      name: 'show',
+      description: 'Show everything about one task: plan, progress, costs, pending approvals',
+      options: [
+        { name: 'json', type: 'boolean', description: 'Machine-readable output' },
+        { name: 'events', type: 'boolean', description: 'Include the full event history' },
+        { name: 'outputs', type: 'boolean', description: 'Include each task\'s output' },
+      ],
+      action: async (ctx) => {
+        const task = requireTask(app, ctx.args[0]);
+        const subtasks = app.store.listSubtasks(task.id);
+        const approvals = app.store.listApprovals(task.id);
+        if (json(ctx.flags)) {
+          out.printJson({ task, subtasks, approvals, events: ctx.flags.events === true ? app.store.listEvents(task.id) : undefined });
+          return ok;
+        }
+        out.writeln(out.bold(truncate(task.goal, 120)));
+        out.writeln(`${task.id}   status: ${task.status}   spent ${formatUsd(task.spentUsd)} of ${formatUsd(task.budgetUsd)}`);
+        if (task.error) out.writeln(out.error(`Error: ${task.error}`));
+        if (task.plan) { out.writeln(); out.writeln(formatPlan(out, task)); }
+        if (subtasks.length) { out.writeln(); out.writeln(subtaskTable(out, subtasks)); }
+        const pending = approvals.filter((a) => a.status === 'pending');
+        for (const a of pending) out.writeln(out.warning(`Waiting for approval: ${a.action} (veritas approve ${task.id})`));
+        if (task.resultPath) out.writeln(`Result: ${task.resultPath}`);
+        if (ctx.flags.outputs === true) {
+          for (const s of subtasks) out.writeln(`\n--- ${s.key}: ${s.title} ---\n${typeof s.output === 'string' ? s.output : JSON.stringify(s.output)}`);
+        }
+        if (ctx.flags.events === true) {
+          out.writeln('\nEvents:');
+          for (const e of app.store.listEvents(task.id)) {
+            out.writeln(`  ${e.ts}  ${e.type}  ${describeEvent(out, e, true)?.trim() ?? ''}`);
+          }
+        }
+        return ok;
+      },
+    },
+    {
+      name: 'cost',
+      description: 'Show what you have spent, by day, task and model',
+      options: [
+        { name: 'days', type: 'number', description: 'Only look at the last N days' },
+        { name: 'json', type: 'boolean', description: 'Machine-readable output' },
+      ],
+      action: async (ctx) => {
+        let since: string | undefined;
+        if (ctx.flags.days !== undefined) {
+          const days = Number(ctx.flags.days);
+          if (!Number.isFinite(days) || days <= 0) throw new ValidationError('--days must be a number above 0.');
+          since = new Date(Date.now() - days * 86_400_000).toISOString();
+        }
+        const r = app.store.costReport(since);
+        if (json(ctx.flags)) { out.printJson(r); return ok; }
+        out.writeln(out.bold(`Total spent${since ? ` in the last ${ctx.flags.days} days` : ''}: ${formatUsd(r.totalUsd)}`));
+        if (!r.byDay.length) { out.writeln('Nothing spent yet.'); return ok; }
+        out.writeln('\nBy day (tasks started that day):');
+        out.writeln(out.table({ columns: [{ key: 'day', header: 'Day', width: 12 }, { key: 'tasks', header: 'Tasks', width: 6, align: 'right' }, { key: 'usd', header: 'Spent', width: 10, align: 'right' }],
+          data: r.byDay.map((d) => ({ day: d.day, tasks: d.tasks, usd: formatUsd(d.usd) })) }));
+        out.writeln('\nBy model (agent runs only, planning not included):');
+        out.writeln(out.table({ columns: [{ key: 'model', header: 'Model', width: 16 }, { key: 'runs', header: 'Runs', width: 6, align: 'right' }, { key: 'usd', header: 'Spent', width: 10, align: 'right' }],
+          data: r.byModel.map((m) => ({ model: m.model, runs: m.runs, usd: formatUsd(m.usd) })) }));
+        out.writeln('\nMost expensive tasks:');
+        out.writeln(out.table({ columns: [{ key: 'id', header: 'Task', width: 21 }, { key: 'slug', header: 'Goal', width: 40 }, { key: 'usd', header: 'Spent', width: 10, align: 'right' }],
+          data: r.byTask.map((t) => ({ id: t.id, slug: t.slug, usd: formatUsd(t.usd) })) }));
+        return ok;
+      },
+    },
+  ];
+}

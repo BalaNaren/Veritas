@@ -1,0 +1,146 @@
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, describe, expect, it } from 'vitest';
+import { ClaudeCodeProvider } from '../../src/agents/claude-code.js';
+import type { ClaudeProbe, Runtime } from '../../src/cli/app.js';
+import { main } from '../../src/cli/main.js';
+import { OutputFormatter } from '../../src/cli/output.js';
+
+const FAKE = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'fake-claude.mjs');
+const homes: string[] = [];
+afterEach(() => { while (homes.length) rmSync(homes.pop()!, { recursive: true, force: true }); });
+
+function harness(opts: { interactive?: boolean; answers?: string[]; probe?: ClaudeProbe; home?: string } = {}) {
+  const home = opts.home ?? mkdtempSync(join(tmpdir(), 'veritas-cli-'));
+  if (!opts.home) homes.push(home);
+  let stdout = '';
+  let stderr = '';
+  const answers = [...(opts.answers ?? [])];
+  const asked: string[] = [];
+  const rt: Runtime = {
+    out: new OutputFormatter({ color: false, stdout: { write: (t) => (stdout += t) }, stderr: { write: (t) => (stderr += t) } }),
+    env: { VERITAS_HOME: home }, cwd: process.cwd(),
+    interactive: opts.interactive ?? false,
+    async ask(q) { asked.push(q); return answers.shift() ?? ''; },
+    makeProvider: () => new ClaudeCodeProvider({ binary: FAKE, defaultTimeoutMs: 15_000 }),
+    probeClaude: async () => opts.probe ?? { found: true, path: '/x/claude', version: '9', loggedIn: true, detail: 'logged in (test)' },
+    onInterrupt: () => () => {},
+    retryDelayMs: 0,
+  };
+  return { home, rt, asked, run: (...argv: string[]) => main(argv, rt), out: () => stdout, err: () => stderr };
+}
+const idOf = (text: string): string => text.match(/task_[0-9a-f]{16}/)![0];
+const GOAL = '[[fake:plan]] research tides';
+
+describe('veritas CLI', () => {
+  it('shows help and the version', async () => {
+    const h = harness();
+    expect(await h.run('--help')).toBe(0);
+    expect(h.out()).toContain('veritas run');
+    expect(await h.run('--version')).toBe(0);
+    expect(await h.run('run', '--help')).toBe(0);
+    expect(h.out()).toContain('--budget');
+  });
+
+  it('rejects unknown commands and options with exit code 2', async () => {
+    const h = harness();
+    expect(await h.run('bogus')).toBe(2);
+    expect(h.err()).toMatch(/Unknown command/);
+    expect(await h.run('list', '--nonsense')).toBe(2);
+  });
+
+  it('asks for a goal and validates the budget', async () => {
+    const h = harness();
+    expect(await h.run('run')).toBe(1);
+    expect(h.err()).toMatch(/Describe the goal/);
+    expect(await h.run('run', 'x', '--budget', '-1')).toBe(1);
+  });
+
+  it('runs end to end when the plan is pre-approved with --yes-plan', async () => {
+    const h = harness();
+    expect(await h.run('run', GOAL, '--yes-plan', '--budget', '3')).toBe(0);
+    expect(h.out()).toMatch(/Done\./);
+    const id = idOf(h.out());
+    expect(existsSync(join(h.home, 'tasks', id, 'result.md'))).toBe(true);
+    expect(await h.run('list')).toBe(0);
+    expect(h.out()).toContain(id);
+  });
+
+  it('plans without running, then runs after `approve`', async () => {
+    const h = harness();
+    expect(await h.run('plan', GOAL)).toBe(3);
+    expect(h.out()).toContain('Nothing has run yet');
+    const id = idOf(h.out());
+    expect(await h.run('status')).toBe(0);
+    expect(await h.run('approve', id)).toBe(0);
+    expect(h.out()).toMatch(/Approved: plan\.start/);
+    expect(h.out()).toMatch(/Done\./);
+    expect(await h.run('approve', id)).toBe(0);
+    expect(h.out()).toMatch(/Nothing is waiting/);
+  });
+
+  it('asks the person in interactive mode and honours each answer', async () => {
+    const yes = harness({ interactive: true, answers: ['y'] });
+    expect(await yes.run('run', GOAL)).toBe(0);
+    expect(yes.asked[0]).toMatch(/Run this plan/);
+
+    const no = harness({ interactive: true, answers: ['n'] });
+    expect(await no.run('run', GOAL)).toBe(3);
+    expect(no.out()).toMatch(/Cancelled/);
+
+    const later = harness({ interactive: true, answers: ['l'] });
+    expect(await later.run('run', GOAL)).toBe(3);
+    expect(later.out()).toMatch(/veritas approve/);
+  });
+
+  it('refuses an approval from `approve --deny`', async () => {
+    const h = harness();
+    await h.run('plan', GOAL);
+    const id = idOf(h.out());
+    expect(await h.run('approve', id, '--deny')).toBe(0);
+    expect(await h.run('show', id, '--json')).toBe(0);
+    expect(JSON.parse(h.out().slice(h.out().lastIndexOf('\n{\n') + 1)).task.status).toBe('cancelled');
+  });
+
+  it('cancels a task', async () => {
+    const h = harness();
+    await h.run('plan', GOAL);
+    const id = idOf(h.out());
+    expect(await h.run('cancel', id)).toBe(0);
+    expect(h.out()).toContain(`Cancelled ${id}`);
+    expect(await h.run('cancel', 'task_missing')).toBe(1);
+  });
+
+  it('shows a task and the cost report', async () => {
+    const h = harness();
+    await h.run('run', GOAL, '--yes-plan');
+    const id = idOf(h.out());
+    expect(await h.run('show', id, '--outputs', '--events')).toBe(0);
+    expect(h.out()).toContain('task.done');
+    expect(await h.run('cost')).toBe(0);
+    expect(h.out()).toMatch(/Total spent: \$0\.\d+/);
+    expect(await h.run('cost', '--days', '0')).toBe(1);
+  });
+
+  it('reads and changes settings, persisting them', async () => {
+    const h = harness();
+    expect(await h.run('config', 'set', 'maxConcurrent', '2')).toBe(0);
+    expect(await harness({ home: h.home }).run('config', 'get', 'maxConcurrent')).toBe(0);
+    const h2 = harness({ home: h.home });
+    await h2.run('config', 'get', 'maxConcurrent');
+    expect(h2.out().trim()).toBe('2');
+    expect(await h2.run('config', 'set', 'maxConcurrent', 'abc')).toBe(1);
+    expect(await h2.run('config', 'set', 'homeDir', '/x')).toBe(1);
+  });
+
+  it('reports problems in doctor', async () => {
+    const bad = harness({ probe: { found: false, detail: 'Claude Code was not found.' } });
+    expect(await bad.run('doctor')).toBe(1);
+    expect(bad.out()).toMatch(/problem/);
+    const notLoggedIn = harness({ probe: { found: true, loggedIn: false, detail: 'Not logged in.' } });
+    expect(await notLoggedIn.run('doctor')).toBe(1);
+    expect(await harness().run('doctor')).toBe(0);
+  });
+});

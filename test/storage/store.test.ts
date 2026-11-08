@@ -183,3 +183,19 @@ describe('paths', () => {
     expect(taskDir('/h', 'task_1')).toBe('/h/tasks/task_1');
   });
 });
+
+describe('costReport', () => {
+  it('summarises spending by day, task and model', () => {
+    const store = Store.open(':memory:');
+    const t = store.createTask({ slug: 'a', goal: 'g', type: 'general', budgetUsd: 1, mode: 'x', cwd: '/' });
+    const [s] = store.createSubtasks(t.id, [{ key: 'k', title: 'k', kind: 'general', instructions: 'i', dependsOn: [] }]);
+    store.updateSubtask(s!.id, { model: 'sonnet', costUsd: 0.2, status: 'done' });
+    store.addSpent(t.id, 0.25);
+    const r = store.costReport();
+    expect(r.totalUsd).toBeCloseTo(0.25);
+    expect(r.byTask[0]).toMatchObject({ id: t.id });
+    expect(r.byModel).toEqual([{ model: 'sonnet', usd: 0.2, runs: 1 }]);
+    expect(r.byDay).toHaveLength(1);
+    expect(store.costReport('9999').totalUsd).toBe(0);
+  });
+});
