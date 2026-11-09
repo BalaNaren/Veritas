@@ -8,6 +8,22 @@ export const TERMINAL_TASK_STATUSES: readonly TaskStatus[] = ['done', 'failed', 
 
 export type SubtaskStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled' | 'skipped';
 
+/** What a coding task works on. The user's own working tree is never part of this. */
+export interface CodingInfo {
+  /** The user's repository (top level). */
+  repo: string;
+  /** Branch that was checked out when the task started, and its commit. The work starts from that commit. */
+  baseBranch: string;
+  baseSha: string;
+  /** Separate working folder and branch the agent works in; null until created, and after cleanup. */
+  worktree: string | null;
+  branch: string | null;
+  /** Command Veritas runs to test, as the user approved it. */
+  testCommand: string | null;
+  /** Optional command run once before testing (for example installing dependencies). */
+  setupCommand: string | null;
+}
+
 export interface TaskRow {
   id: string;
   slug: string;
@@ -24,6 +40,7 @@ export interface TaskRow {
   assumptions: string[];
   /** Absolute paths of the files the user gave this task. */
   inputs: string[];
+  coding: CodingInfo | null;
   plan: Plan | null;
   resultPath: string | null;
   error: string | null;

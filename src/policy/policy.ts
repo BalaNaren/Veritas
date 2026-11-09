@@ -69,6 +69,12 @@ export const DEFAULT_RULES: readonly PolicyRule[] = [
   { action: 'plan.start', decision: 'ask', reason: 'You approve the plan and cost before anything runs' },
   { action: 'budget.exceed', decision: 'ask', locked: true, reason: 'Spending beyond the budget always needs your approval' },
   { action: 'task.write_output', decision: 'allow', reason: 'Results are written inside the task folder' },
+  // Coding tasks. The agent works in a separate copy; nothing reaches your repository without you saying so.
+  { action: 'cmd.first_run', decision: 'ask', reason: 'Running a project command (such as its tests) runs that project\'s own code on your computer' },
+  { action: 'git.commit', decision: 'ask', locked: true, reason: 'Saving the changes as a commit always needs your approval' },
+  { action: 'git.merge', decision: 'ask', locked: true, reason: 'Merging into your branch always needs your approval' },
+  { action: 'git.push', decision: 'ask', locked: true, reason: 'Sending anything to a remote always needs your approval' },
+  { action: 'fs.write_outside_output', decision: 'deny', reason: 'Veritas does not write files outside the task folder and the separate working copy' },
   // Never available in this version.
   { action: 'email.send', decision: 'deny', reason: 'Sending messages is not supported' },
   { action: 'payment.make', decision: 'deny', reason: 'Payments are not supported' },

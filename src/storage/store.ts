@@ -3,7 +3,7 @@ import { newId } from '../shared/ids.js';
 import { safeJsonParse } from '../shared/json.js';
 import { openDatabase, type Db } from './db.js';
 import type {
-  ApprovalRow, ApprovalStatus, EventRow, SubtaskRow, SubtaskStatus, TaskRow, TaskStatus,
+  ApprovalRow, ApprovalStatus, CodingInfo, EventRow, SubtaskRow, SubtaskStatus, TaskRow, TaskStatus,
 } from './models.js';
 
 type Row = Record<string, unknown>;
@@ -21,7 +21,7 @@ function mapTask(r: Row): TaskRow {
     id: r.id as string, slug: r.slug as string, goal: r.goal as string, type: r.type as string,
     status: r.status as TaskStatus, createdAt: r.created_at as string, updatedAt: r.updated_at as string,
     budgetUsd: r.budget_usd as number, spentUsd: r.spent_usd as number, mode: r.mode as string,
-    cwd: r.cwd as string, assumptions: parse<string[]>(r.assumptions, []), inputs: parse<string[]>(r.inputs, []),
+    cwd: r.cwd as string, assumptions: parse<string[]>(r.assumptions, []), inputs: parse<string[]>(r.inputs, []), coding: r.coding == null ? null : parse<CodingInfo | null>(r.coding, null),
     plan: r.plan == null ? null : parse<Plan | null>(r.plan, null),
     resultPath: (r.result_path as string | null) ?? null, error: (r.error as string | null) ?? null,
   };
@@ -64,6 +64,7 @@ export interface NewTask {
   mode: string;
   cwd: string;
   inputs?: string[];
+  coding?: CodingInfo;
 }
 
 export interface NewSubtask {
@@ -83,6 +84,7 @@ export interface TaskPatch {
   resultPath?: string | null;
   error?: string | null;
   budgetUsd?: number;
+  coding?: CodingInfo | null;
 }
 
 export interface SubtaskPatch {
@@ -155,9 +157,9 @@ export class Store {
     const id = newId('task');
     const ts = now();
     this.db.prepare(
-      `INSERT INTO tasks (id, slug, goal, type, status, created_at, updated_at, budget_usd, spent_usd, mode, cwd, assumptions, inputs)
-       VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 0, ?, ?, '[]', ?)`,
-    ).run(id, input.slug, input.goal, input.type, ts, ts, input.budgetUsd, input.mode, input.cwd, j(input.inputs ?? []));
+      `INSERT INTO tasks (id, slug, goal, type, status, created_at, updated_at, budget_usd, spent_usd, mode, cwd, assumptions, inputs, coding)
+       VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 0, ?, ?, '[]', ?, ?)`,
+    ).run(id, input.slug, input.goal, input.type, ts, ts, input.budgetUsd, input.mode, input.cwd, j(input.inputs ?? []), input.coding ? j(input.coding) : null);
     return this.getTask(id)!;
   }
 
@@ -185,7 +187,7 @@ export class Store {
 
   updateTask(id: string, patch: TaskPatch): TaskRow {
     const { sql, params } = setClause(patch as Record<string, unknown>, {
-      status: { col: 'status' }, type: { col: 'type' }, plan: { col: 'plan', json: true }, assumptions: { col: 'assumptions', json: true },
+      status: { col: 'status' }, type: { col: 'type' }, coding: { col: 'coding', json: true }, plan: { col: 'plan', json: true }, assumptions: { col: 'assumptions', json: true },
       resultPath: { col: 'result_path' }, error: { col: 'error' }, budgetUsd: { col: 'budget_usd' },
     });
     this.db.prepare(`UPDATE tasks SET ${sql ? sql + ', ' : ''}updated_at = ? WHERE id = ?`).run(...params, now(), id);

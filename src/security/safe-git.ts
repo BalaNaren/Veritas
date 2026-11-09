@@ -14,7 +14,6 @@ const HARDENING_CONFIG = [
   `core.hooksPath=${devNull}`,
   'core.pager=cat',
   'core.editor=true',
-  'diff.external=',
   'protocol.ext.allow=never',
   'credential.helper=',
 ] as const;
@@ -22,7 +21,7 @@ const HARDENING_CONFIG = [
 /** Subcommands Veritas may run. Extend deliberately. */
 const ALLOWED_SUBCOMMANDS = new Set([
   'status', 'diff', 'log', 'show', 'rev-parse', 'rev-list', 'ls-files', 'branch', 'worktree', 'checkout',
-  'switch', 'add', 'commit', 'merge', 'apply', 'reset', 'stash', 'config', 'cat-file', 'symbolic-ref', 'init',
+  'switch', 'add', 'commit', 'merge', 'apply', 'reset', 'stash', 'config', 'cat-file', 'symbolic-ref', 'init', 'push', 'remote',
 ]);
 
 // None of the allowed subcommands accept these, so any appearance is suspicious.
@@ -36,6 +35,8 @@ export interface GitOptions {
   input?: string;
   /** Skip optional index locks (use for read-only commands). */
   readOnly?: boolean;
+  /** Extra environment (for example the identity to commit as). */
+  env?: Record<string, string>;
 }
 
 export class GitDeniedError extends Error {
@@ -56,13 +57,23 @@ export function gitArgv(repoRoot: string, args: readonly string[]): string[] {
   for (const arg of args) {
     if (arg.includes('\0')) throw new GitDeniedError('Argument contains a NUL byte');
   }
+  if (sub === 'push') {
+    // The only push Veritas makes: a new Veritas branch to a named remote. No force, no deletes, no other refs.
+    const ok = rest.length === 3 && rest[0] === '--set-upstream' && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(rest[1]!) && /^veritas\/[A-Za-z0-9._\/-]+$/.test(rest[2]!) && !rest[2]!.includes('..');
+    if (!ok) throw new GitDeniedError('git push is only allowed as: push --set-upstream <remote> veritas/<branch>');
+  }
+  if (sub === 'remote' && !(rest.length === 0 || (rest.length === 2 && rest[0] === 'get-url' && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(rest[1]!)))) {
+    throw new GitDeniedError('git remote is only allowed as: remote, or remote get-url <name>');
+  }
   for (const arg of rest) {
     if (FORBIDDEN_ARG_PREFIXES.some((p) => arg.startsWith(p))) {
       throw new GitDeniedError(`git argument not allowed: ${arg}`);
     }
   }
   const config = HARDENING_CONFIG.flatMap((c) => ['-c', c]);
-  return [...config, '-C', repoRoot, ...args];
+  // Commands that produce diffs must not run a program named in the repository's settings (external diff drivers, text converters).
+  const safeArgs = sub === 'diff' || sub === 'show' || sub === 'log' ? [sub, '--no-ext-diff', '--no-textconv', ...rest] : [...args];
+  return [...config, '-C', repoRoot, ...safeArgs];
 }
 
 export function gitEnv(readOnly = false): Record<string, string> {
@@ -84,7 +95,7 @@ export async function git(repoRoot: string, args: readonly string[], options: Gi
   const bin = findGit();
   if (!bin) throw new GitDeniedError('git was not found on PATH');
   return runProcess(bin, gitArgv(repoRoot, args), {
-    env: gitEnv(options.readOnly),
+    env: { ...gitEnv(options.readOnly), ...(options.env ?? {}) },
     timeoutMs: options.timeoutMs ?? 60_000,
     maxOutputBytes: options.maxOutputBytes ?? 8 * 1024 * 1024,
     input: options.input,

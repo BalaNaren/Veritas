@@ -163,4 +163,26 @@ export const MIGRATIONS: readonly string[] = [
   CREATE TRIGGER memory_ai AFTER INSERT ON memory BEGIN INSERT INTO memory_fts(rowid, text) VALUES (new.rowid, new.text); END;
   CREATE TRIGGER memory_ad AFTER DELETE ON memory BEGIN INSERT INTO memory_fts(memory_fts, rowid, text) VALUES ('delete', old.rowid, old.text); END;
   `,
+  // 7: coding tasks (repository, worktree and branch), test runs captured by Veritas, commands the user approved per project
+  `
+  ALTER TABLE tasks ADD COLUMN coding TEXT;
+  CREATE TABLE test_runs (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    phase TEXT NOT NULL,
+    command TEXT NOT NULL,
+    exit_code INTEGER,
+    timed_out INTEGER NOT NULL DEFAULT 0,
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    output TEXT NOT NULL DEFAULT '',
+    started_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_test_runs_task ON test_runs(task_id);
+  CREATE TABLE approved_commands (
+    repo TEXT NOT NULL,
+    command TEXT NOT NULL,
+    approved_at TEXT NOT NULL,
+    PRIMARY KEY (repo, command)
+  );
+  `,
 ];
