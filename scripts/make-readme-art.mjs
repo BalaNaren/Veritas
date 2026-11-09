@@ -93,19 +93,11 @@ function banner() {
 }
 
 // ---------------------------------------------------------------- capability cards
-/** A rounded rectangle as a path, so its length can be normalised with pathLength (which works on paths in every browser). */
-const roundedRectPath = (x, y, w, h, r) => `M${x + r} ${y} H${x + w - r} A${r} ${r} 0 0 1 ${x + w} ${y + r} V${y + h - r} A${r} ${r} 0 0 1 ${x + w - r} ${y + h} H${x + r} A${r} ${r} 0 0 1 ${x} ${y + h - r} V${y + r} A${r} ${r} 0 0 1 ${x + r} ${y} Z`;
-
 function card(x, y, title, lines, icon, accent, label, index = 0) {
-  const border = roundedRectPath(6, 6, 592, 238, 19);
-  // A light that runs once around the border. The path length is set to 100, so a dash that slides by exactly 100 goes
-  // all the way round and joins up with itself: no jump at the seam.
-  const run = (width, opacity) => `<path d="${border}" pathLength="100" fill="none" stroke="#ffffff" stroke-width="${width}" stroke-opacity="${opacity}" stroke-linecap="round" stroke-dasharray="16 84" stroke-dashoffset="${process.env.ART_DASH ?? 0}">${process.env.ART_DASH !== undefined ? '' : `<animate attributeName="stroke-dashoffset" from="0" to="-100" dur="8s" begin="${(index * 1.7).toFixed(1)}s" repeatCount="indefinite"/>`}</path>`;
   return `<g transform="translate(${x} ${y})">
 <rect width="604" height="250" rx="24" fill="#0c1426" stroke="${C.line}" stroke-width="2"/>
 <rect x="6" y="6" width="592" height="238" rx="19" fill="none" stroke="${accent}" stroke-width="3" opacity=".9" filter="url(#g)"/>
 <rect x="6" y="6" width="592" height="238" rx="19" fill="none" stroke="#ffffff" stroke-opacity=".25" stroke-width="1"/>
-${run(14, 0.20)}${run(4, 1)}
 <g transform="translate(96 100)"><circle r="62" fill="#101d36"/>${icon}</g>
 <text x="190" y="72" font-family="${SANS}" font-size="15" letter-spacing="5" fill="${accent}">${label}</text>
 <text x="190" y="116" font-family="${SANS}" font-weight="700" font-size="36" fill="${C.text}">${title}</text>

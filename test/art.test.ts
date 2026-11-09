@@ -29,17 +29,10 @@ describe('README graphics', () => {
     expect(missing, name).toEqual([]);
   });
 
-  it('keeps the moving light on the capability cards exactly on the card border and seamless', () => {
+  it('has no moving line on the capability cards', () => {
     const cap = readFileSync(join(dir, 'capabilities.svg'), 'utf8');
-    const lights = [...cap.matchAll(/<path d="(M[^"]+)" pathLength="100"[^>]*stroke-dasharray="(\d+) (\d+)"[^>]*>(?:<animate[^>]*>)?/g)];
-    expect(lights.length).toBe(8); // two layers on each of four cards
-    for (const [, d, dash, gap] of lights) {
-      expect(Number(dash) + Number(gap)).toBe(100);                // the pattern repeats exactly once per lap
-      expect(d).toContain('M25 6 H579 A19 19 0 0 1 598 25');   // the same rounded rectangle as the card border (x 6, y 6, 592 wide, 238 high, radius 19)
-      expect(d!.endsWith('Z')).toBe(true);
-    }
-    const animations = [...cap.matchAll(/<animate attributeName="stroke-dashoffset" from="0" to="-100" dur="8s" begin="([\d.]+)s" repeatCount="indefinite"\/>/g)];
-    expect(animations.length).toBe(8);
-    expect(new Set(animations.map((a) => a[1])).size).toBe(4);       // the cards start at different times
+    expect(cap).not.toMatch(/<animate/);
+    expect(cap).not.toContain('pathLength');
+    expect(cap.match(/translate\(\d+ \d+\)">\n<rect width="604"/g)?.length).toBe(4);   // the four cards are still there
   });
 });
