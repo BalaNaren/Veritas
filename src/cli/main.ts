@@ -10,7 +10,7 @@ const GROUPS: { title: string; names: string[] }[] = [
   { title: 'Do work', names: ['run', 'code', 'plan', 'approve', 'resume', 'cancel'] },
   { title: 'Keep coding work', names: ['apply', 'discard'] },
   { title: 'Look at work', names: ['list', 'status', 'show', 'export', 'cost'] },
-  { title: 'Setup', names: ['setup', 'memory', 'config', 'doctor', 'version'] },
+  { title: 'Setup', names: ['setup', 'memory', 'config', 'doctor', 'mcp', 'version'] },
 ];
 
 export function helpText(commands: readonly Command[], only?: Command): string {

@@ -1,3 +1,4 @@
+import { serveStdio } from '../../mcp/server.js';
 import { existsSync, statSync } from 'node:fs';
 import { loadConfig, flattenConfig, setConfigValue, configPath, SETTABLE_KEYS } from '../../config.js';
 import { dbPath, ensureHome } from '../../storage/paths.js';
@@ -171,6 +172,15 @@ export function adminCommands(app: App): Command[] {
         const bad = checks.filter((c) => !c.ok).length;
         out.writeln(bad ? out.error(`\n${bad} problem${bad === 1 ? '' : 's'} found.`) : out.success('\nAll good.'));
         return { success: bad === 0, exitCode: bad ? 1 : 0 };
+      },
+    },
+    {
+      name: 'mcp',
+      description: 'Run a read-only MCP server over stdio, so Claude Code can look at your tasks, reports and costs',
+      action: async () => {
+        // stdout carries protocol messages only; nothing else may be printed here.
+        await serveStdio({ store: app.store, home: app.home }, process.stdin, process.stdout);
+        return ok;
       },
     },
     {
