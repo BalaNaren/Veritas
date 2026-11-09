@@ -110,4 +110,13 @@ export const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX idx_claims_task ON claims(task_id, status);
   `,
+  // 3: every address that led to a stored source (what the agent cited, each redirect hop, the final address)
+  `
+  CREATE TABLE source_aliases (
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+    PRIMARY KEY (task_id, url)
+  );
+  `,
 ];

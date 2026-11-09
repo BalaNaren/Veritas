@@ -57,7 +57,7 @@ export async function ingestFindings(o: IngestOptions): Promise<IngestResult> {
         title: extracted.title ?? findings.find((f) => f.url === url)?.title ?? null,
         contentType: res.contentType, bytes: res.body.length, sha256: res.sha256, fetchedAt: res.fetchedAt,
         // Only a date the page itself declares is kept; a date the agent supplies has not been verified.
-        publishedAt: extracted.publishedAt ?? null, text: extracted.text,
+        publishedAt: extracted.publishedAt ?? null, text: extracted.text, aliases: res.chain,
       });
       result.sourcesFetched++;
       o.events.emit(o.taskId, 'source.fetched', { url, finalUrl: source.finalUrl, quality: source.quality }, o.subtask.id);

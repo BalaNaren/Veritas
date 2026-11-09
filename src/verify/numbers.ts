@@ -36,16 +36,40 @@ export function extractNumbers(text: string): FoundNumber[] {
 const round = (n: number): number => Number(n.toPrecision(12));
 
 export interface NumberCheck {
+  /** False when the claim states a figure the passage does not contain. */
   ok: boolean;
-  /** Numbers in the claim that the passage does not contain. */
+  /** Figures in the claim that the passage does not contain. */
   missing: FoundNumber[];
+  /**
+   * Years and days of the month that the claim adds as context when the passage gives no year at all
+   * (for example "In 2024, packs averaged $97/kWh" quoting only "$97/kWh"). Weaker than a wrong figure.
+   */
+  contextMissing: FoundNumber[];
   claimNumbers: FoundNumber[];
+}
+
+const MONTHS = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?';
+const DAY_BEFORE = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?${MONTHS}`, 'gi');
+const DAY_AFTER = new RegExp(`\\b${MONTHS}\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'gi');
+const isYear = (n: FoundNumber): boolean => !n.percent && Number.isInteger(n.value) && n.value >= 1900 && n.value <= 2100 && /^\d{4}$/.test(n.raw);
+
+function dayNumbers(text: string): Set<number> {
+  const days = new Set<number>();
+  for (const re of [DAY_BEFORE, DAY_AFTER]) for (const m of text.matchAll(re)) days.add(Number(m[1]));
+  return days;
 }
 
 /** Check that all numbers in `claim` appear in `passage` (same value; a percentage only matches a percentage). */
 export function checkNumbers(claim: string, passage: string): NumberCheck {
   const claimNumbers = extractNumbers(claim);
   const available = extractNumbers(passage);
-  const missing = claimNumbers.filter((c) => !available.some((a) => a.value === c.value && (!c.percent || a.percent)));
-  return { ok: missing.length === 0, missing, claimNumbers };
+  const absent = claimNumbers.filter((c) => !available.some((a) => a.value === c.value && (!c.percent || a.percent)));
+  // A year or a date's day that is merely extra context is weaker than a wrong figure, but only when the passage names no year;
+  // a different year in the passage means the claim contradicts it.
+  const passageHasYear = available.some(isYear);
+  const days = dayNumbers(claim);
+  const isContext = (n: FoundNumber): boolean => !passageHasYear && (isYear(n) || (!n.percent && days.has(n.value)));
+  const contextMissing = absent.filter(isContext);
+  const missing = absent.filter((n) => !isContext(n));
+  return { ok: missing.length === 0, missing, contextMissing, claimNumbers };
 }

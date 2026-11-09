@@ -19,6 +19,7 @@ const PAGE = '<html><head><title>Moon facts</title></head><body><main><p>The Moo
 
 beforeAll(async () => {
   server = createServer((req, res) => {
+    if (req.url === '/short') { res.writeHead(302, { Location: '/moon' }); res.end(); return; }
     if (req.url === '/moon') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(PAGE); return; }
     res.writeHead(404); res.end('no');
   });
@@ -90,6 +91,15 @@ describe('ingestFindings', () => {
     const r = await ingestFindings({ evidence: t.evidence, fetcher: t.fetcher, events: t.events, taskId: t.task.id, subtask: sub });
     expect(r).toMatchObject({ claims: 2, duplicates: 1, sourcesFetched: 1 });
     expect(t.evidence.listSources(t.task.id)).toHaveLength(1);
+  });
+
+  it('accepts a claim citing a shortened or redirecting address of a page it did fetch', async () => {
+    const t = setup();
+    const sub = t.withOutput([finding(), finding({ claim: 'The Moon orbits Earth.', quote: 'The Moon orbits Earth at an average distance', url: `http://moon.test:${port}/short` })]);
+    await ingestFindings({ evidence: t.evidence, fetcher: t.fetcher, events: t.events, taskId: t.task.id, subtask: sub });
+    expect(t.evidence.listSources(t.task.id)).toHaveLength(1);
+    const summary = await verifyClaims({ evidence: t.evidence, checker: agreeing, taskId: t.task.id });
+    expect(summary).toMatchObject({ confirmed: 2, removed: 0 });
   });
 
   it('refuses output that is not valid findings', async () => {

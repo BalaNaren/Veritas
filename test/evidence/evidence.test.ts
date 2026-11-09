@@ -38,6 +38,20 @@ describe('EvidenceStore', () => {
     expect(ev.findSource(task.id, 'https://www.nasa.gov/a')?.id).toBe(a.id);
   });
 
+  it('finds a source by any address that led to it: the one cited, each redirect hop, and with or without a #fragment', () => {
+    const { ev, task } = setup();
+    const s = ev.addSource(src(task.id, { url: 'https://nasa.gov/short-link', finalUrl: 'https://www.nasa.gov/a', aliases: ['https://nasa.gov/short-link', 'https://nasa.gov/hop'] }));
+    for (const u of ['https://nasa.gov/short-link', 'https://nasa.gov/hop', 'https://www.nasa.gov/a', 'https://www.nasa.gov/a#section-2']) {
+      expect(ev.findSource(task.id, u)?.id, u).toBe(s.id);
+    }
+    expect(ev.findSource(task.id, 'https://nasa.gov/other')).toBeUndefined();
+    // A second variant that lands on the same page is attached to the same source.
+    const again = ev.addSource(src(task.id, { url: 'https://nasa.gov/truncated', finalUrl: 'https://www.nasa.gov/a' }));
+    expect(again.id).toBe(s.id);
+    expect(ev.findSource(task.id, 'https://nasa.gov/truncated')?.id).toBe(s.id);
+    expect(ev.listSources(task.id)).toHaveLength(1);
+  });
+
   it('detects a snapshot that was edited after it was saved', () => {
     const { ev, task } = setup();
     const s = ev.addSource(src(task.id));

@@ -103,6 +103,15 @@ describe('verifyClaims: code checks', () => {
     expect(t.evidence.getClaim(c.id)!.status).toBe('confirmed');
   });
 
+  it('flags, rather than removes, a claim that adds a year the quote does not mention', async () => {
+    const t = setup();
+    t.addSource('https://www.reuters.com/m', 'Analysts said the market was worth $5.2 billion.');
+    const c = t.claim({ text: 'In 2023 the market was worth $5.2 billion.', type: 'number', url: 'https://www.reuters.com/m', quote: 'the market was worth $5.2 billion' });
+    await verifyClaims({ evidence: t.evidence, checker: scripted().checker, taskId: t.task.id });
+    expect(t.evidence.getClaim(c.id)).toMatchObject({ status: 'flagged' });
+    expect(t.evidence.getClaim(c.id)!.reason).toBe('Date or year not in the quote: 2023');
+  });
+
   it('removes a number claim whose number is not in the quote, but only flags other claim types', async () => {
     const t = setup();
     t.addSource('https://www.reuters.com/m', MARKET);

@@ -85,6 +85,22 @@ describe('checkNumbers', () => {
   });
 });
 
+describe('year and date context', () => {
+  it('treats a year the quote does not mention as context, not as a wrong figure', () => {
+    const r = checkNumbers('In 2024, packs averaged $97/kWh.', 'packs averaged $97/kWh');
+    expect(r).toMatchObject({ ok: true, missing: [] });
+    expect(r.contextMissing.map((x) => x.value)).toEqual([2024]);
+    expect(checkNumbers('BNEF found in its 27 Nov 2023 survey that prices fell 14%.', 'prices fell 14%').contextMissing.map((x) => x.value)).toEqual([27, 2023]);
+  });
+  it('still rejects a different year when the quote names one, and any wrong figure', () => {
+    expect(checkNumbers('Sent in 1979.', 'The first message was sent in 1969').ok).toBe(false);
+    expect(checkNumbers('In 2024, packs averaged $98/kWh.', 'packs averaged $97/kWh').ok).toBe(false);
+  });
+  it('does not treat ordinary numbers that look like days as context', () => {
+    expect(checkNumbers('There were 27 cases.', 'There were 28 cases.').ok).toBe(false);
+  });
+});
+
 describe('known limit: numbers written as words', () => {
   it('are not compared by the code check (the independent checker has to catch them)', () => {
     expect(checkNumbers('Demand will grow fivefold', 'Demand is projected to triple').ok).toBe(true);

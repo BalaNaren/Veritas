@@ -75,6 +75,8 @@ export interface NewSource {
   publishedAt?: string | null;
   /** Extracted readable text that quotes will be checked against. */
   text: string;
+  /** Every address visited on the way (redirect hops); each will resolve to this source. */
+  aliases?: string[];
 }
 
 export interface NewClaim {
@@ -94,6 +96,11 @@ export interface ClaimPatch {
   quoteEnd?: number | null;
   checks?: CheckResult[];
   reason?: string | null;
+}
+
+/** Compare addresses without the part after `#`, which never reaches the server. */
+export function normalizeUrl(url: string): string {
+  try { const u = new URL(url); u.hash = ''; return u.href; } catch { return url; }
 }
 
 const sha256 = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
@@ -121,7 +128,7 @@ export class EvidenceStore {
   /** Save a fetched page. Fetching the same final address twice in one task returns the first record. */
   addSource(input: NewSource): SourceRow {
     const existing = this.findSource(input.taskId, input.finalUrl);
-    if (existing) return existing;
+    if (existing) { this.addAliases(existing, [input.url, input.finalUrl, ...(input.aliases ?? [])]); return existing; }
     const id = newId('src');
     const dir = join(taskDir(this.home, input.taskId), 'sources');
     ensureDir(dir);
@@ -133,7 +140,14 @@ export class EvidenceStore {
        VALUES (?, ?, ?, ?, ?, 'web', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(id, input.taskId, input.url, input.finalUrl, input.title ?? null, input.fetchedAt, input.contentType, input.bytes, input.sha256,
       sha256(input.text), path, input.publishedAt ?? null, rating.quality, rating.reason);
-    return this.getSource(id)!;
+    const created = this.getSource(id)!;
+    this.addAliases(created, [input.url, input.finalUrl, ...(input.aliases ?? [])]);
+    return created;
+  }
+
+  private addAliases(source: SourceRow, urls: readonly string[]): void {
+    const insert = this.store.db.prepare('INSERT OR IGNORE INTO source_aliases (task_id, url, source_id) VALUES (?, ?, ?)');
+    for (const u of new Set(urls.map(normalizeUrl))) insert.run(source.taskId, u, source.id);
   }
 
   getSource(id: string): SourceRow | undefined {
@@ -143,7 +157,10 @@ export class EvidenceStore {
 
   /** Find a source of this task by the address given or the address finally reached. */
   findSource(taskId: string, url: string): SourceRow | undefined {
-    const r = this.store.db.prepare('SELECT * FROM sources WHERE task_id = ? AND (final_url = ? OR url = ?) ORDER BY fetched_at LIMIT 1').get(taskId, url, url) as Row | undefined;
+    const norm = normalizeUrl(url);
+    const r = this.store.db.prepare(
+      `SELECT s.* FROM sources s JOIN source_aliases a ON a.source_id = s.id WHERE a.task_id = ? AND a.url = ? LIMIT 1`,
+    ).get(taskId, norm) as Row | undefined;
     return r ? mapSource(r) : undefined;
   }
 

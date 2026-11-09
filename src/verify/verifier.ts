@@ -93,6 +93,10 @@ async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: rea
     checks.push(fail('numbers', `The claim states ${list}, which the quote does not contain`));
     if (claim.type === 'number') return done('removed', `Number not in the quote: ${list}`, source, match.start!, match.end!);
     numbersReason = `Figures not in the quote: ${list}`;
+  } else if (nums.contextMissing.length) {
+    const list = nums.contextMissing.map((m) => m.raw).join(', ');
+    checks.push(fail('numbers', `The claim gives ${list} as context, but the quote does not name it`));
+    numbersReason = `Date or year not in the quote: ${list}`;
   } else if (nums.claimNumbers.length) {
     checks.push(pass('numbers', `All ${nums.claimNumbers.length} number(s) appear in the quote`));
   }
