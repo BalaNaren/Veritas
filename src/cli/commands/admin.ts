@@ -176,10 +176,18 @@ export function adminCommands(app: App): Command[] {
     },
     {
       name: 'mcp',
-      description: 'Run a read-only MCP server over stdio, so Claude Code can look at your tasks, reports and costs',
+      description: 'Run an MCP server over stdio so Claude Code can look at your tasks and plan new ones (it cannot approve or run them)',
       action: async () => {
         // stdout carries protocol messages only; nothing else may be printed here.
-        await serveStdio({ store: app.store, home: app.home }, process.stdin, process.stdout);
+        await serveStdio({
+          store: app.store, home: app.home,
+          // Plans only: no pre-approval and no approver, so the task stops at "awaiting approval".
+          plan: async (goal, budgetUsd) => {
+            const engine = app.engine();
+            const task = engine.createTask(goal, { budgetUsd, cwd: app.rt.cwd });
+            return (await engine.execute(task.id)).task;
+          },
+        }, process.stdin, process.stdout);
         return ok;
       },
     },

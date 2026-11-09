@@ -107,7 +107,7 @@ Before anything runs you see the plan and a cost estimate and you approve it.
 | `memory` | See, search or erase what Veritas remembers between tasks. |
 | `approve`, `resume`, `cancel` | Decide a waiting question, continue a paused task, or stop one. |
 | `config`, `doctor`, `setup` | Settings, health check, and the analysis sandbox. |
-| `mcp` | A read-only MCP server over stdio so Claude Code can look at your tasks, reports and costs. It cannot start or approve anything. |
+| `mcp` | An MCP server over stdio so Claude Code can look at your tasks, reports and costs, and plan new goals. It cannot approve or run anything: you approve in your own terminal. |
 
 </details>
 
