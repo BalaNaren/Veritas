@@ -4,6 +4,8 @@ import type { VeritasConfig } from '../cli/types.js';
 import { estimatePlanCost, type CostHistory } from '../cost/estimate.js';
 import type { Plan } from './plan.js';
 import { kindIds } from './kinds.js';
+
+const DATA_KINDS = ['csv', 'xlsx', 'json'];
 import { planJsonSchema, validatePlanDraft, type PlanLimits } from './plan-schema.js';
 import { goalWithContext, plannerPrompt, plannerRetryPrompt, type FileSummary } from './prompts.js';
 import { tryJsonParse } from '../shared/json.js';
@@ -17,6 +19,8 @@ export interface PlannerOptions {
   decided?: readonly string[];
   /** Files the user supplied (already read), so the planner can use document tasks. */
   files?: readonly FileSummary[];
+  /** True when analysis code can be run (a sandbox is set up), so the data kind may be used. */
+  dataAvailable?: boolean;
   signal?: AbortSignal;
   /** Spending cap for one planner call. */
   maxBudgetUsd?: number;
@@ -28,7 +32,7 @@ export type PlanOutcome =
 
 /** Ask the planner agent to split a goal into tasks. Retries once with feedback if the answer is invalid. */
 export async function planGoal(goal: string, opts: PlannerOptions): Promise<PlanOutcome> {
-  const limits: PlanLimits = { maxSubtasks: opts.config.maxSubtasks, kinds: kindIds((opts.files?.length ?? 0) > 0) };
+  const limits: PlanLimits = { maxSubtasks: opts.config.maxSubtasks, kinds: kindIds({ files: (opts.files?.length ?? 0) > 0, data: !!opts.dataAvailable && (opts.files ?? []).some((f) => DATA_KINDS.includes(f.kind)) }) };
   const schema = planJsonSchema(limits);
   const model = modelFor('planner', opts.config.models);
   let cost = 0;

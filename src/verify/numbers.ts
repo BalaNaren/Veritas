@@ -14,6 +14,10 @@ export interface FoundNumber {
   raw: string;
   value: number;
   percent: boolean;
+  /** Digits after the decimal point as written. */
+  decimals: number;
+  /** Magnitude word applied (1 for none, 1e6 for "million"). */
+  scale: number;
 }
 
 const NUMBER_RE = /(?<![\w.])(\d{1,3}(?:[,  ]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)\s*(%|percent\b|per cent\b|thousand\b|million\b|billion\b|trillion\b|bn\b|mn\b|tn\b|k\b|m\b|b\b|t\b)?/gi;
@@ -28,7 +32,7 @@ export function extractNumbers(text: string): FoundNumber[] {
     const unit = (m[2] ?? '').toLowerCase();
     const percent = unit === '%' || unit === 'percent' || unit === 'per cent';
     const scale = !percent && unit ? MAGNITUDES[unit] ?? 1 : 1;
-    out.push({ raw: m[0].trim(), value: round(base * scale), percent });
+    out.push({ raw: m[0].trim(), value: round(base * scale), percent, decimals: (digits.split('.')[1] ?? '').length, scale });
   }
   return out;
 }
@@ -66,11 +70,25 @@ export function stripLocators(text: string): string {
   return text.replace(LOCATOR_RE, ' ');
 }
 
-/** Check that all numbers in `claim` appear in `passage` (same value; a percentage only matches a percentage). */
-export function checkNumbers(claim: string, passage: string): NumberCheck {
+/**
+ * Does a figure computed by code support the figure a claim states? The claim may round it to the precision it shows
+ * ("5.2 million" for 5,234,567), drop the sign (direction is for the checker), and give a stored fraction as a percentage.
+ */
+export function matchesComputed(claim: FoundNumber, stored: FoundNumber): boolean {
+  const half = (Math.pow(10, -claim.decimals) * claim.scale) / 2 + 1e-9 * Math.max(1, Math.abs(claim.value));
+  const close = (a: number, b: number): boolean => Math.abs(Math.abs(a) - Math.abs(b)) <= half;
+  return close(claim.value, stored.value) || (claim.percent && close(claim.value, stored.value * 100));
+}
+
+/**
+ * Check that all numbers in `claim` appear in `passage` (same value; a percentage only matches a percentage).
+ * With `computed`, the passage holds figures produced by code and rounding is allowed (see `matchesComputed`).
+ */
+export function checkNumbers(claim: string, passage: string, computed = false): NumberCheck {
   const claimNumbers = extractNumbers(stripLocators(claim));
   const available = extractNumbers(passage);
-  const absent = claimNumbers.filter((c) => !available.some((a) => a.value === c.value && (!c.percent || a.percent)));
+  const same = (c: FoundNumber, a: FoundNumber): boolean => (computed ? matchesComputed(c, a) : a.value === c.value && (!c.percent || a.percent));
+  const absent = claimNumbers.filter((c) => !available.some((a) => same(c, a)));
   // A year or a date's day that is merely extra context is weaker than a wrong figure, but only when the passage names no year;
   // a different year in the passage means the claim contradicts it.
   const passageHasYear = available.some(isYear);

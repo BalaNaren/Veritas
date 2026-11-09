@@ -4,7 +4,7 @@ import { runProcess } from '../shared/process.js';
 import { SandboxError } from './types.js';
 
 /** Exact versions of the analysis libraries. The Dockerfile must list the same ones. */
-export const PINNED_PACKAGES: readonly string[] = ['numpy==2.0.2', 'pandas==2.2.3', 'matplotlib==3.9.4'];
+export const PINNED_PACKAGES: readonly string[] = ['numpy==2.0.2', 'pandas==2.2.3', 'matplotlib==3.9.4', 'openpyxl==3.1.5'];
 
 export const venvDir = (home: string): string => join(home, 'runtime', 'python');
 export const venvPython = (home: string): string => join(venvDir(home), process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');

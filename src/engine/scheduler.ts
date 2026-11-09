@@ -9,6 +9,9 @@ import { getKind } from './kinds.js';
 import { tryJsonParse } from '../shared/json.js';
 import { join } from 'node:path';
 import { taskDir } from '../storage/paths.js';
+import { EvidenceStore } from '../evidence/evidence-store.js';
+import { RunStore } from '../evidence/runs.js';
+import type { Sandbox } from '../sandbox/types.js';
 import { goalWithContext, workerPrompt, type DependencyResult } from './prompts.js';
 
 export type RunOutcome =
@@ -25,6 +28,8 @@ export interface SchedulerOptions {
   config: Pick<VeritasConfig, 'models' | 'maxConcurrent' | 'agentTimeoutMs' | 'homeDir'>;
   task: TaskRow;
   signal?: AbortSignal;
+  /** Where analysis code runs; needed only for data tasks. */
+  sandbox?: Sandbox;
   /** Attempts per task, including the first (default 2). */
   maxAttempts?: number;
   /** Wait before a retry, multiplied by the attempt number (default 1000 ms). */
@@ -55,6 +60,8 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
     if (s.status === 'running') store.updateSubtask(s.id, { status: 'pending', startedAt: null });
   }
 
+  const evidence = new EvidenceStore(store, opts.config.homeDir);
+  const runs = new RunStore(store, evidence, opts.config.homeDir);
   const inFlight = new Map<string, Promise<void>>();
   let budgetBlocked = false;
 
@@ -86,7 +93,10 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
     while (attempt < maxAttempts) {
       attempt++;
       store.updateSubtask(s.id, { attempts: attempt });
-      let res: AgentRunResult = await provider.run({
+      let res: AgentRunResult = kind.executor ? await kind.executor({
+        task, subtask: s, goal: goalWithContext(task.goal, task.assumptions), model, capUsd: currentCap, timeoutMs: opts.config.agentTimeoutMs, signal,
+        provider, evidence, runs, sandbox: opts.sandbox, homeDir: opts.config.homeDir,
+      }) : await provider.run({
         prompt, model, cwd: agentCwd, addDirs: kind.fileAccess ? [agentCwd] : undefined,
         tools: kind.tools, allowedTools: kind.allowedTools, jsonSchema: kind.outputSchema,
         maxBudgetUsd: currentCap, timeoutMs: opts.config.agentTimeoutMs, signal,

@@ -69,7 +69,8 @@ interface Located extends QuoteMatch {
 
 /** Find a quote in a source. For a file, it must be on the cited page; a quote on another page is found but reported. */
 function locate(source: SourceRow, snapshot: string, claim: ClaimRow): Located {
-  if (source.kind !== 'file' || !source.units?.length) return findQuote(snapshot, claim.quote!);
+  // Quotes of computed claims are built by Veritas from stored results, so short ones are not a risk.
+  if (source.kind !== 'file' || !source.units?.length) return findQuote(snapshot, claim.quote!, claim.type === 'computed' ? 3 : undefined);
   const tryUnit = (u: { start: number; end: number }): QuoteMatch => {
     const m = findQuote(snapshot.slice(u.start, u.end), claim.quote!);
     return m.found ? { found: true, start: m.start! + u.start, end: m.end! + u.start } : m;
@@ -131,12 +132,12 @@ async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: rea
   const exact = snapshot.slice(match.start!, match.end!);
 
   // 4 (before 3, because it is free): numbers in the claim must be in the quote.
-  const nums = checkNumbers(claim.text, exact);
+  const nums = checkNumbers(claim.text, exact, claim.type === 'computed');
   let numbersReason: string | null = null;
   if (!nums.ok) {
     const list = nums.missing.map((m) => m.raw).join(', ');
     checks.push(fail('numbers', `The claim states ${list}, which the quote does not contain`));
-    if (claim.type === 'number') return done('removed', `Number not in the quote: ${list}`, source, match.start!, match.end!);
+    if (claim.type === 'number' || claim.type === 'computed') return done('removed', `Number not in the quote: ${list}`, source, match.start!, match.end!);
     numbersReason = `Figures not in the quote: ${list}`;
   } else if (unexplainedContext(nums.contextMissing, source).length) {
     const list = unexplainedContext(nums.contextMissing, source).map((m) => m.raw).join(', ');

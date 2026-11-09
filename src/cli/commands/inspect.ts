@@ -5,7 +5,7 @@ import type { App } from '../app.js';
 import { describeEvent } from '../progress.js';
 import { formatPlan, subtaskTable, taskTable, truncate } from '../format.js';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { taskDir } from '../../storage/paths.js';
 import { writeFileAtomic } from '../../shared/fs.js';
 import { EXPORT_FORMATS, exportReport, type ExportFormat } from '../../write/export.js';
@@ -132,7 +132,7 @@ export function inspectCommands(app: App): Command[] {
         if (!EXPORT_FORMATS.includes(format)) throw new ValidationError(`--as must be one of ${EXPORT_FORMATS.join(', ')}.`);
         const markdown = readFileSync(task.resultPath, 'utf8');
         const target = ctx.flags.out ? resolve(app.rt.cwd, String(ctx.flags.out)) : join(taskDir(app.home, task.id), `result.${format}`);
-        writeFileAtomic(target, await exportReport(markdown, format));
+        writeFileAtomic(target, await exportReport(markdown, format, dirname(task.resultPath)));
         out.writeln(`Saved ${target}`);
         return ok;
       },

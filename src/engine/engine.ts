@@ -16,6 +16,8 @@ import { basename } from 'node:path';
 import { DocumentError } from '../documents/types.js';
 import { readDocument } from '../documents/readers.js';
 import { EvidenceStore, fileUrl } from '../evidence/evidence-store.js';
+import { chooseSandbox } from '../sandbox/index.js';
+import type { Sandbox } from '../sandbox/types.js';
 import { runSubtasks } from './scheduler.js';
 import { finishResearch } from './research-pipeline.js';
 import { fetchUrl } from '../tools/web-fetch.js';
@@ -36,6 +38,8 @@ export interface EngineOptions {
   fetcher?: Fetcher;
   /** Replaces the AI checker (tests). */
   checker?: Checker;
+  /** Where analysis code runs. Defaults to the best sandbox this machine has; if none, data analysis is not offered. */
+  sandbox?: Sandbox | (() => Promise<Sandbox | undefined>);
   /** Delay before retrying a failed agent (tests set 0). */
   retryDelayMs?: number;
 }
@@ -67,13 +71,12 @@ export type ExecuteResult = { task: TaskRow; resultPath?: string };
 const HUMAN = 'user';
 
 /** Task types whose results go through evidence collection, verification and writing. */
-const EVIDENCE_TASK_TYPES = ['research', 'documents', 'mixed'];
+const EVIDENCE_TASK_TYPES = ['research', 'documents', 'data', 'mixed'];
 
 function taskTypeFor(kinds: readonly string[]): string {
-  const web = kinds.includes('research');
-  const docs = kinds.includes('document');
-  if (web && docs) return 'mixed';
-  return docs ? 'documents' : web ? 'research' : 'general';
+  const evidence = [...new Set(kinds.filter((k) => k === 'research' || k === 'document' || k === 'data'))];
+  if (evidence.length > 1) return 'mixed';
+  return evidence[0] === 'document' ? 'documents' : evidence[0] ?? 'general';
 }
 
 export class Engine {
@@ -85,6 +88,8 @@ export class Engine {
   private readonly retryDelayMs?: number;
   private readonly fetcher: Fetcher;
   private readonly checker?: Checker;
+  private readonly sandboxOption?: Sandbox | (() => Promise<Sandbox | undefined>);
+  private sandboxCache?: Promise<Sandbox | undefined>;
 
   constructor(opts: EngineOptions) {
     this.store = opts.store;
@@ -95,6 +100,7 @@ export class Engine {
     this.retryDelayMs = opts.retryDelayMs;
     this.fetcher = opts.fetcher ?? fetchUrl;
     this.checker = opts.checker;
+    this.sandboxOption = opts.sandbox;
   }
 
   createTask(goal: string, opts: NewTaskOptions = {}): TaskRow {
@@ -162,6 +168,14 @@ export class Engine {
 
   // ------------------------------------------------------------------
 
+  private getSandbox(): Promise<Sandbox | undefined> {
+    return (this.sandboxCache ??= (async () => {
+      const o = this.sandboxOption;
+      if (o) return typeof o === 'function' ? o() : o;
+      return (await chooseSandbox(this.config.homeDir)).sandbox;
+    })());
+  }
+
   /** Read the user's files once, store their text, and make them citable. Returns the failed task if one cannot be read. */
   private async prepareFiles(task: TaskRow): Promise<TaskRow | undefined> {
     if (!task.inputs.length) return undefined;
@@ -216,11 +230,20 @@ export class Engine {
 
   private async plan(task: TaskRow, signal?: AbortSignal): Promise<TaskRow> {
     this.events.emit(task.id, 'plan.started');
+    const fileSummaries = new EvidenceStore(this.store, this.config.homeDir).listSources(task.id).filter((s) => s.kind === 'file')
+      .map((s) => ({ name: s.title ?? s.url, kind: s.contentType ?? 'file', units: s.units?.length ?? 0 }));
+    const hasDataFiles = fileSummaries.some((f) => ['csv', 'xlsx', 'json'].includes(f.kind));
+    const dataAvailable = hasDataFiles && (await this.getSandbox()) !== undefined;
+    if (hasDataFiles && !dataAvailable) {
+      this.events.emit(task.id, 'sandbox.unavailable', { message: 'No sandbox is set up, so analysis code will not be run. Run `veritas setup`.' });
+      if (!task.assumptions.some((a) => a.startsWith('Calculations were not run'))) {
+        task = this.store.updateTask(task.id, { assumptions: [...task.assumptions, 'Calculations were not run: no sandbox is set up (run `veritas setup`), so the data files can be read and quoted but not analysed with code.'] });
+      }
+    }
     const outcome = await planGoal(task.goal, {
       provider: this.provider, config: this.config, cwd: task.cwd, signal,
       history: this.store.averageSubtaskCostByModel(), decided: task.assumptions,
-      files: new EvidenceStore(this.store, this.config.homeDir).listSources(task.id).filter((s) => s.kind === 'file')
-        .map((s) => ({ name: s.title ?? s.url, kind: s.contentType ?? 'file', units: s.units?.length ?? 0 })),
+      files: fileSummaries, dataAvailable,
     });
     if (outcome.costUsd > 0) this.store.addSpent(task.id, outcome.costUsd);
     if (!outcome.ok) {
@@ -291,6 +314,7 @@ export class Engine {
       const outcome = await runSubtasks({
         store: this.store, events: this.events, provider: this.provider, budget, config: this.config,
         task: fresh, signal, retryDelayMs: this.retryDelayMs,
+        sandbox: this.store.listSubtasks(task.id).some((s) => s.kind === 'data') ? await this.getSandbox() : undefined,
       });
 
       if (outcome.status === 'cancelled') {

@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { inflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { exportReport, inlineRuns, parseReport } from '../../src/write/export.js';
@@ -77,6 +80,42 @@ describe('tables', () => {
     expect(xml).toContain('90 days [1]');
     expect((await exportReport(md, 'pdf')).subarray(0, 5).toString()).toBe('%PDF-');
   });
+});
+
+describe('code and images', () => {
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  const md = '## Chart\n\n![Revenue by region](charts/a.png)\n\n![Escape attempt](../secret.png)\n\n## Code\n\n```python\nimport csv\nfor r in rows:\n    print(r)\n```\n\nAfter.';
+  const dir = mkdtempSync(join(tmpdir(), 'veritas-exp-'));
+  mkdirSync(join(dir, 'report', 'charts'), { recursive: true });
+  writeFileSync(join(dir, 'report', 'charts', 'a.png'), PNG);
+  writeFileSync(join(dir, 'secret.png'), PNG);
+  const base = join(dir, 'report');
+
+  it('parses fenced code (keeping indentation) and images', () => {
+    const blocks = parseReport(md);
+    expect(blocks.find((b) => b.type === 'code')).toEqual({ type: 'code', lines: ['import csv', 'for r in rows:', '    print(r)'] });
+    expect(blocks.filter((b) => b.type === 'image')).toHaveLength(2);
+    expect(blocks.at(-1)).toMatchObject({ type: 'paragraph' });
+  });
+  it('puts the chart and the code in a Word document, and skips an image outside the report folder', async () => {
+    const buf = await exportReport(md, 'docx', base);
+    const names: string[] = [];
+    const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+    let p = buf.readUInt32LE(eocd + 16);
+    for (let i = 0; i < buf.readUInt16LE(eocd + 10); i++) { const n = buf.readUInt16LE(p + 28); names.push(buf.toString('utf8', p + 46, p + 46 + n)); p += 46 + n + buf.readUInt16LE(p + 30) + buf.readUInt16LE(p + 32); }
+    expect(names.filter((n) => n.startsWith('word/media/'))).toHaveLength(1);
+    const xml = unzip(buf, 'word/document.xml');
+    expect(xml).toContain('Courier New');
+    expect(xml).toContain('for r in rows:');
+    expect(xml).toContain('Escape attempt');
+  });
+  it('writes a PDF with the chart and the code', async () => {
+    const withImage = await exportReport(md, 'pdf', base);
+    const without = await exportReport(md, 'pdf');
+    expect(withImage.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(withImage.length).toBeGreaterThan(without.length);
+  });
+  it('cleans up', () => { rmSync(dir, { recursive: true, force: true }); });
 });
 
 describe('exportReport', () => {

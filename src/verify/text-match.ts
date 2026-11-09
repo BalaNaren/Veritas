@@ -51,11 +51,11 @@ export const MIN_QUOTE_CHARS = 12;
  * Find `quote` in `snapshot`. A quote may use "..." (or an ellipsis character)
  * to skip words; each piece between the markers must appear, in order.
  */
-export function findQuote(snapshot: string, quote: string): QuoteMatch {
+export function findQuote(snapshot: string, quote: string, minChars: number = MIN_QUOTE_CHARS): QuoteMatch {
   const q = normalizeForMatch(quote).replace(/\[\.\.\.\]/g, '...');
   const pieces = q.split('...').map((p) => p.trim().replace(/^[\s.,;:'"()\[\]-]+|[\s.,;:'"()\[\]-]+$/g, '')).filter(Boolean);
-  if (!pieces.length || pieces.join('').length < MIN_QUOTE_CHARS) {
-    return { found: false, reason: `The quote is too short to check (needs at least ${MIN_QUOTE_CHARS} characters)` };
+  if (!pieces.length || pieces.join('').length < minChars) {
+    return { found: false, reason: `The quote is too short to check (needs at least ${minChars} characters)` };
   }
   const src = normalizeWithMap(snapshot);
   let from = 0;

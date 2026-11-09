@@ -39,7 +39,7 @@ export interface SourceRow {
   units: SourceUnit[] | null;
 }
 
-export type ClaimType = 'fact' | 'number' | 'quote';
+export type ClaimType = 'fact' | 'number' | 'quote' | 'computed';
 export type ClaimStatus = 'pending' | 'confirmed' | 'flagged' | 'removed' | 'analysis';
 
 export interface CheckResult {
@@ -112,6 +112,9 @@ export interface ClaimPatch {
 
 /** The identifier a file source goes by in claims. */
 export const fileUrl = (name: string): string => `file:${name}`;
+
+/** The identifier a sandbox run goes by in claims. */
+export const runUrl = (runId: string): string => `run:${runId}`;
 
 /** Compare addresses without the part after `#`, which never reaches the server. */
 export function normalizeUrl(url: string): string {
@@ -188,6 +191,18 @@ export class EvidenceStore {
     ).run(id, taskId, url, url, doc.name, new Date().toISOString(), doc.kind, doc.bytes, doc.sha256, sha256(text), path, JSON.stringify(units));
     const created = this.getSource(id)!;
     this.addAliases(created, [url]);
+    return created;
+  }
+
+  /** Register a source whose snapshot text has already been written to `snapshotPath`. */
+  insertSource(i: { taskId: string; url: string; finalUrl: string; title: string; kind: string; contentType: string; bytes: number; sha256: string; text: string; snapshotPath: string; quality: SourceQuality; qualityReason: string }): SourceRow {
+    const id = newId('src');
+    this.store.db.prepare(
+      `INSERT INTO sources (id, task_id, url, final_url, title, kind, fetched_at, content_type, bytes, sha256, text_sha256, snapshot_path, published_at, quality, quality_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+    ).run(id, i.taskId, i.url, i.finalUrl, i.title, i.kind, new Date().toISOString(), i.contentType, i.bytes, i.sha256, sha256(i.text), i.snapshotPath, i.quality, i.qualityReason);
+    const created = this.getSource(id)!;
+    this.addAliases(created, [i.url, i.finalUrl]);
     return created;
   }
 

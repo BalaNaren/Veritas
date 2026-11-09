@@ -1,6 +1,7 @@
+import { readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
-import { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
+import { dirname, join, resolve, sep } from 'node:path';
+import { Document, HeadingLevel, ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
 import pdfmake from 'pdfmake';
 
 export type ExportFormat = 'md' | 'docx' | 'pdf';
@@ -14,7 +15,9 @@ export type Block =
   | { type: 'numbered'; n: number; runs: Run[] }
   | { type: 'quote'; runs: Run[] }
   | { type: 'note'; runs: Run[] }
-  | { type: 'table'; rows: string[][] };
+  | { type: 'table'; rows: string[][] }
+  | { type: 'code'; lines: string[] }
+  | { type: 'image'; caption: string; path: string };
 
 /** Split `**bold**` markers into runs. */
 export function inlineRuns(text: string): Run[] {
@@ -31,9 +34,17 @@ export function inlineRuns(text: string): Run[] {
 export function parseReport(markdown: string): Block[] {
   const blocks: Block[] = [];
   let para: string[] = [];
+  let fence: string[] | undefined;
   const flush = (): void => { if (para.length) { blocks.push({ type: 'paragraph', runs: inlineRuns(para.join(' ')) }); para = []; } };
   for (const raw of markdown.split('\n')) {
+    if (/^\s*```/.test(raw)) {
+      if (fence) { blocks.push({ type: 'code', lines: fence }); fence = undefined; } else { flush(); fence = []; }
+      continue;
+    }
+    if (fence) { fence.push(raw); continue; }
     const line = raw.trimEnd();
+    const img = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (img) { flush(); blocks.push({ type: 'image', caption: img[1]!, path: img[2]! }); continue; }
     const h = line.match(/^(#{1,6})\s+(.*)$/);
     const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
     const numbered = line.match(/^(\d+)\.\s+(.*)$/);
@@ -55,7 +66,21 @@ export function parseReport(markdown: string): Block[] {
     para.push(line.trim());
   }
   flush();
+  if (fence) blocks.push({ type: 'code', lines: fence });
   return blocks;
+}
+
+/** Read a chart image that sits inside the report's own folder. Anything outside it, or that is not a PNG, is skipped. */
+function readImage(baseDir: string | undefined, path: string): { data: Buffer; width: number; height: number } | undefined {
+  if (!baseDir) return undefined;
+  try {
+    const root = realpathSync(baseDir);
+    const full = realpathSync(resolve(root, path));
+    if (!full.startsWith(root + sep) || !/\.png$/i.test(full)) return undefined;
+    const data = readFileSync(full);
+    if (data.length < 24 || data.readUInt32BE(0) !== 0x89504e47) return undefined;
+    return { data, width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+  } catch { return undefined; }
 }
 
 // ---------- DOCX ----------
@@ -63,19 +88,27 @@ export function parseReport(markdown: string): Block[] {
 const HEADINGS = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 } as const;
 const docxRuns = (runs: Run[], italics = false): TextRun[] => runs.map((r) => new TextRun({ text: r.text, bold: r.bold, italics }));
 
-export async function toDocx(markdown: string): Promise<Buffer> {
-  const children = parseReport(markdown).map((b) => {
+export async function toDocx(markdown: string, baseDir?: string): Promise<Buffer> {
+  const children = parseReport(markdown).flatMap((b): (Paragraph | Table)[] => {
     switch (b.type) {
-      case 'heading': return new Paragraph({ heading: HEADINGS[b.level], children: [new TextRun(b.text)] });
-      case 'bullet': return new Paragraph({ bullet: { level: 0 }, children: docxRuns(b.runs) });
-      case 'numbered': return new Paragraph({ indent: { left: 360, hanging: 360 }, children: [new TextRun(`${b.n}. `), ...docxRuns(b.runs)] });
-      case 'quote': return new Paragraph({ indent: { left: 720 }, children: docxRuns(b.runs, true) });
-      case 'note': return new Paragraph({ indent: { left: 720 }, children: docxRuns(b.runs) });
-      case 'table': return new Table({
+      case 'heading': return [new Paragraph({ heading: HEADINGS[b.level], children: [new TextRun(b.text)] })];
+      case 'code': return b.lines.map((l) => new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: l || ' ', font: 'Courier New', size: 17 })] }));
+      case 'image': {
+        const img = readImage(baseDir, b.path);
+        const caption = new Paragraph({ children: [new TextRun({ text: b.caption, italics: true })] });
+        if (!img) return [caption];
+        const width = Math.min(560, img.width);
+        return [new Paragraph({ children: [new ImageRun({ type: 'png', data: img.data, transformation: { width, height: Math.round((img.height * width) / img.width) } })] }), caption];
+      }
+      case 'bullet': return [new Paragraph({ bullet: { level: 0 }, children: docxRuns(b.runs) })];
+      case 'numbered': return [new Paragraph({ indent: { left: 360, hanging: 360 }, children: [new TextRun(`${b.n}. `), ...docxRuns(b.runs)] })];
+      case 'quote': return [new Paragraph({ indent: { left: 720 }, children: docxRuns(b.runs, true) })];
+      case 'note': return [new Paragraph({ indent: { left: 720 }, children: docxRuns(b.runs) })];
+      case 'table': return [new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         rows: b.rows.map((row, r) => new TableRow({ tableHeader: r === 0, children: row.map((c) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: c, bold: r === 0 })] })] })) })),
-      });
-      default: return new Paragraph({ spacing: { after: 120 }, children: docxRuns(b.runs) });
+      })];
+      default: return [new Paragraph({ spacing: { after: 120 }, children: docxRuns(b.runs) })];
     }
   });
   return Packer.toBuffer(new Document({ creator: 'Veritas', title: 'Veritas report', sections: [{ children }] }));
@@ -102,7 +135,7 @@ function prepareFonts(): string {
   return dir;
 }
 
-export async function toPdf(markdown: string): Promise<Buffer> {
+export async function toPdf(markdown: string, baseDir?: string): Promise<Buffer> {
   prepareFonts();
   const content = parseReport(markdown).map((b) => {
     switch (b.type) {
@@ -111,6 +144,13 @@ export async function toPdf(markdown: string): Promise<Buffer> {
       case 'numbered': return { columns: [{ width: 22, text: `${b.n}.` }, { width: '*', text: pdfRuns(b.runs) }], margin: [0, 4, 0, 0] };
       case 'quote': return { text: pdfRuns(b.runs, { italics: true, color: '#444444' }), margin: [22, 0, 0, 2] };
       case 'note': return { text: pdfRuns(b.runs, { color: '#8a4b00' }), margin: [22, 0, 0, 2] };
+      case 'code': return { text: b.lines.join('\n'), preserveLeadingSpaces: true, fontSize: 7.5, lineHeight: 1.1, color: '#222222', margin: [8, 2, 0, 8] };
+      case 'image': {
+        const img = readImage(baseDir, b.path);
+        return img
+          ? { stack: [{ image: `data:image/png;base64,${img.data.toString('base64')}`, width: Math.min(440, img.width) }, { text: pdfText(b.caption), italics: true, fontSize: 9, margin: [0, 2, 0, 8] }] }
+          : { text: pdfText(b.caption), italics: true, margin: [0, 0, 0, 6] };
+      }
       case 'table': return {
         table: { headerRows: 1, widths: b.rows[0]!.map(() => '*'), body: b.rows.map((row, r) => row.map((c) => ({ text: pdfText(c), bold: r === 0 }))) },
         layout: 'lightHorizontalLines', margin: [0, 4, 0, 8],
@@ -122,7 +162,7 @@ export async function toPdf(markdown: string): Promise<Buffer> {
 }
 
 /** Render the finished Markdown report in another format. Markdown is returned as written. */
-export async function exportReport(markdown: string, format: ExportFormat): Promise<Buffer> {
+export async function exportReport(markdown: string, format: ExportFormat, baseDir?: string): Promise<Buffer> {
   if (format === 'md') return Buffer.from(markdown, 'utf8');
-  return format === 'docx' ? toDocx(markdown) : toPdf(markdown);
+  return format === 'docx' ? toDocx(markdown, baseDir) : toPdf(markdown, baseDir);
 }

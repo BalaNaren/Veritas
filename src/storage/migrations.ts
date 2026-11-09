@@ -125,4 +125,25 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE sources ADD COLUMN units TEXT;
   ALTER TABLE claims ADD COLUMN location INTEGER;
   `,
+  // 5: analysis runs (code that Veritas ran in the sandbox, and what it produced)
+  `
+  CREATE TABLE runs (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    subtask_id TEXT,
+    source_id TEXT,
+    attempt INTEGER NOT NULL DEFAULT 1,
+    code TEXT NOT NULL,
+    backend TEXT NOT NULL,
+    exit_code INTEGER,
+    timed_out INTEGER NOT NULL DEFAULT 0,
+    stdout TEXT NOT NULL DEFAULT '',
+    stderr TEXT NOT NULL DEFAULT '',
+    results TEXT,
+    outputs TEXT NOT NULL DEFAULT '[]',
+    started_at TEXT NOT NULL,
+    duration_ms INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX idx_runs_task ON runs(task_id);
+  `,
 ];

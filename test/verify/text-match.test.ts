@@ -118,3 +118,21 @@ describe('known limit: numbers written as words', () => {
     expect(extractNumbers('one hundred and twelve')).toEqual([]);
   });
 });
+
+describe('numbers computed by code', () => {
+  const stored = 'revenue_change_pct: -11.84\nq3_total: 5234567\nshare: 0.12\nregion.north: 120.5';
+  it.each([
+    ['Revenue fell 11.8% in the quarter.', true], ['Revenue fell 12% in the quarter.', true], ['Revenue fell 11.84 percent.', true],
+    ['Total revenue was $5.2 million.', true], ['Total revenue was 5,234,567 dollars.', true], ['The share was 12%.', true],
+    ['The north region had 120.5 units.', true], ['The north region had about 121 units.', true],
+  ])('accepts a faithful rounding: %s', (claim, ok) => expect(checkNumbers(claim, stored, true).ok).toBe(ok));
+  it.each([
+    'Revenue fell 15% in the quarter.', 'Total revenue was $5.5 million.', 'The north region had 130 units.', 'Revenue fell 11.9%.', 'The share was 13%.',
+  ])('rejects a figure the code did not produce: %s', (claim) => expect(checkNumbers(claim, stored, true).ok).toBe(false));
+  it('is strict for ordinary claims', () => {
+    expect(checkNumbers('Revenue fell 12%.', 'revenue_change_pct: -11.84').ok).toBe(false);
+  });
+  it('does not read digits inside names as figures', () => {
+    expect(extractNumbers('q3_total: 5234567\nregion2.sales: 4')).toMatchObject([{ value: 5234567 }, { value: 4 }]);
+  });
+});

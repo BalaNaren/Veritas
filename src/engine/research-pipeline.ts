@@ -3,7 +3,11 @@ import type { ModelProvider } from '../agents/provider.js';
 import type { VeritasConfig } from '../cli/types.js';
 import { Budget } from '../cost/budget.js';
 import { EvidenceStore } from '../evidence/evidence-store.js';
+import { ingestDataFindings } from '../data/ingest-data.js';
+import { RunStore } from '../evidence/runs.js';
 import { ingestFindings, type Fetcher } from '../research/ingest.js';
+import type { DataOutput } from '../data/schemas.js';
+import { copyFileSync } from 'node:fs';
 import { ensureDir, writeFileAtomic } from '../shared/fs.js';
 import type { TaskRow } from '../storage/models.js';
 import { taskDir } from '../storage/paths.js';
@@ -46,6 +50,7 @@ function charged(inner: Checker, store: Store, taskId: string, budget: Budget): 
 export async function finishResearch(d: PipelineDeps, task: TaskRow, signal?: AbortSignal): Promise<PipelineOutcome> {
   const { store, events } = d;
   const evidence = new EvidenceStore(store, d.config.homeDir);
+  const runStore = new RunStore(store, evidence, d.config.homeDir);
   const interrupted = (): PipelineOutcome => ({ status: 'interrupted' });
 
   store.updateTask(task.id, { status: 'verifying' });
@@ -56,6 +61,7 @@ export async function finishResearch(d: PipelineDeps, task: TaskRow, signal?: Ab
   for (const sub of store.listSubtasks(task.id)) {
     if (sub.status !== 'done' || !EVIDENCE_KINDS.includes(sub.kind) || already.has(sub.id)) continue;
     try {
+      if (sub.kind === 'data') { ingestDataFindings({ evidence, runs: runStore, events, taskId: task.id, subtask: sub }); continue; }
       await ingestFindings({ evidence, fetcher: d.fetcher, events, taskId: task.id, subtask: sub, signal, concurrency: d.config.maxConcurrent });
     } catch (e) {
       if (signal?.aborted) return interrupted();
@@ -95,13 +101,30 @@ export async function finishResearch(d: PipelineDeps, task: TaskRow, signal?: Ab
     body = 'No claim survived checking, so there is nothing sourced to report. See the verification summary below for what was found and why it was not accepted.';
   }
 
-  // 4. Save.
-  const markdown = renderMarkdown({
-    goal: task.goal, assumptions: task.assumptions, body, claims, sources: evidence.listSources(task.id),
-    summary, analysisSentences, removedSentences, notes,
-  });
+  // 4. Save, together with the code behind every computed number and the charts the code drew.
   const dir = taskDir(d.config.homeDir, task.id);
   ensureDir(dir);
+  const usedRunIds = new Set(claims.filter((c) => c.status !== 'removed' && c.type === 'computed' && c.url?.startsWith('run:')).map((c) => c.url!.slice(4)));
+  const runs = runStore.listRuns(task.id).filter((r) => usedRunIds.has(r.id)).map((r) => ({ id: r.id, code: r.code, attempt: r.attempt, backend: r.backend }));
+  const charts: { path: string; caption: string }[] = [];
+  for (const sub of store.listSubtasks(task.id)) {
+    if (sub.status !== 'done' || sub.kind !== 'data') continue;
+    const out = sub.output as DataOutput;
+    const run = runStore.getRun(out.runId);
+    if (!run || !usedRunIds.has(run.id)) continue;
+    for (const c of out.charts) {
+      const file = run.outputs.find((o) => o.name === c.file);
+      if (!file) continue;
+      ensureDir(join(dir, 'charts'));
+      const name = `${run.id.slice(4, 12)}-${c.file.replace(/[^\w.-]/g, '_')}`;
+      copyFileSync(file.path, join(dir, 'charts', name));
+      charts.push({ path: `charts/${name}`, caption: c.caption });
+    }
+  }
+  const markdown = renderMarkdown({
+    goal: task.goal, assumptions: task.assumptions, body, claims, sources: evidence.listSources(task.id),
+    summary, analysisSentences, removedSentences, notes, runs, charts,
+  });
   const resultPath = join(dir, 'result.md');
   writeFileAtomic(resultPath, markdown);
   return { status: 'done', resultPath };
