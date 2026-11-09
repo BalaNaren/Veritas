@@ -117,7 +117,7 @@ describe('renderMarkdown', () => {
     fetchedAt: '2026-03-04T00:00:00Z', contentType: 'text/html', bytes: 1, sha256: 'a', textSha256: 'b', snapshotPath: '/x', publishedAt: n === 1 ? '2024-05-06' : null,
     quality: 'primary', qualityReason: null,
   }));
-  const summary = { checked: 4, confirmed: 2, flagged: 1, removed: 1, analysis: 0, notChecked: 0, sources: { total: 3, primary: 3, secondary: 0, unrated: 0 }, flaggedReasons: { 'Only partly supported by its source': 1 }, removedReasons: { 'Not supported by its source': 1 }, costUsd: 0 };
+  const summary = { checked: 4, confirmed: 2, flagged: 1, removed: 1, analysis: 0, notChecked: 0, sources: { total: 3, primary: 3, secondary: 0, unrated: 0, low: 0 }, flaggedReasons: { 'Only partly supported by its source': 1 }, removedReasons: { 'Not supported by its source': 1 }, costUsd: 0 };
   const md = renderMarkdown({
     goal: 'The Moon', assumptions: ['English sources only'], body: 'It is 384,400 km away [c1]. It takes 27.3 days [c2]. Tides follow [c3][c1].',
     claims: CLAIMS, sources, summary, analysisSentences: 0, removedSentences: ['An invented sentence.'],
@@ -133,7 +133,7 @@ describe('renderMarkdown', () => {
     expect(md.indexOf('## Assumptions')).toBeLessThan(md.indexOf('It is 384,400'));
     expect(md).toContain('- ✓ Confirmed: 2');
     expect(md).toContain('- ⚠ Flagged: 1 (1 only partly supported by its source)');
-    expect(md).toContain('- Sources used: 3 (3 primary · 0 secondary · 0 unrated)');
+    expect(md).toContain('- Sources used: 3 (3 primary · 0 secondary · 0 unrated · 0 low-confidence)');
     expect(md).toContain('Sentences removed from the draft for lacking a source: 1');
     expect(md).toContain('does not prove the page itself is correct');
   });

@@ -57,7 +57,7 @@ describe('verifyClaims: code checks', () => {
     expect(done.checks.map((x) => x.step)).toEqual(['source_exists', 'quote_matches', 'numbers', 'support']);
     expect(done.checks.every((x) => x.passed)).toBe(true);
     expect(MOON.slice(done.quoteStart!, done.quoteEnd!)).toBe('average distance of 384,400 km');
-    expect(summary).toMatchObject({ confirmed: 1, removed: 0, flagged: 0, sources: { total: 1, primary: 1 } });
+    expect(summary).toMatchObject({ confirmed: 1, removed: 0, flagged: 0, sources: { total: 1, primary: 1, low: 0 } });
     expect(summary.costUsd).toBeCloseTo(0.001);
   });
 
@@ -148,13 +148,25 @@ describe('verifyClaims: checker verdicts', () => {
 });
 
 describe('verifyClaims: quality, age and cross-checks', () => {
-  it('flags an important claim backed only by an unrated source', async () => {
+  it('flags an important claim backed only by user-generated content, but not one from an unlisted site', async () => {
     const t = setup();
-    t.addSource('https://random-blog.example/moon', MOON);
-    const c = t.claim({ text: 'The Moon orbits Earth.', url: 'https://random-blog.example/moon', quote: 'The Moon orbits Earth at an average distance', important: true });
+    t.addSource('https://www.reddit.com/r/space/moon', MOON);
+    t.addSource('https://independent-analyst.example/moon', MOON);
+    const forum = t.claim({ text: 'The Moon orbits Earth.', url: 'https://www.reddit.com/r/space/moon', quote: 'The Moon orbits Earth at an average distance', important: true });
+    const other = t.claim({ text: 'The Moon orbits Earth.', url: 'https://independent-analyst.example/moon', quote: 'The Moon orbits Earth at an average distance', important: true });
     await verifyClaims({ evidence: t.evidence, checker: scripted().checker, taskId: t.task.id });
-    expect(t.evidence.getClaim(c.id)).toMatchObject({ status: 'flagged' });
-    expect(t.evidence.getClaim(c.id)!.reason).toContain('not on the recognised lists');
+    expect(t.evidence.getClaim(forum.id)).toMatchObject({ status: 'flagged', reason: 'Important claim backed only by user-generated content' });
+    expect(t.evidence.getClaim(other.id)!.status).toBe('confirmed');
+  });
+
+  it('accepts a year the claim adds when it is the year the page says it was published', async () => {
+    const t = setup();
+    t.addSource('https://www.reuters.com/m', 'Analysts said the market was worth $5.2 billion.', '2023-11-27');
+    const same = t.claim({ text: 'In 2023 the market was worth $5.2 billion.', type: 'number', url: 'https://www.reuters.com/m', quote: 'the market was worth $5.2 billion' });
+    const other = t.claim({ text: 'In 2021 the market was worth $5.2 billion.', type: 'number', url: 'https://www.reuters.com/m', quote: 'the market was worth $5.2 billion' });
+    await verifyClaims({ evidence: t.evidence, checker: scripted().checker, taskId: t.task.id });
+    expect(t.evidence.getClaim(same.id)!.status).toBe('confirmed');
+    expect(t.evidence.getClaim(other.id)!.status).toBe('flagged');
   });
 
   it('flags an old source for a number, using the date the page declared', async () => {

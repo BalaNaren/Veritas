@@ -202,7 +202,7 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 
 **4. Evidence store** (`src/evidence/`)
 - [x] Tables `sources`, `claims` (migration 2, `src/evidence/`); every finding's URL is **re-fetched by Veritas itself** (web-fetch tool) — the agent's fetch is not trusted.
-- [x] Source quality labeling by domain rules (`primary` / `secondary` / `unrated`; "unrated" means not on the recognised lists, not "bad") and `ageInDays` helper. *(Checker-agent fallback for unrated sources and the recency flag on fast-changing figures are applied in the verifier.)*
+- [x] Source quality labeling by domain rules (`primary` / `secondary` / `unrated` / `low`; "unrated" means not on the recognised lists, not "bad"; `low` is user-generated content, and only an important claim backed solely by `low` is flagged) and `ageInDays` helper. *(Checker-agent fallback for unrated sources and the recency flag on fast-changing figures are applied in the verifier.)*
 
 **5. Verifier** (`src/verify/`) — PRODUCT.md §10.3
 - [x] Step 1 *source exists* (code): source fetched in this task and stored.

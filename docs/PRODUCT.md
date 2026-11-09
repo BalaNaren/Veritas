@@ -510,9 +510,10 @@ Every claim goes through a pipeline. Steps 1 and 2 are done by plain code; steps
 Not all sources are equal. Each source gets a quality label that is shown to the user:
 - **Primary:** official documents, original research, government data, company filings.
 - **Secondary:** reputable news, industry reports, established reference works.
-- **Low confidence:** anonymous, unsourced, outdated or user-generated content.
+- **Unrated:** a source that is not on Veritas's recognised lists. It is shown as unrated, which does not mean it is wrong.
+- **Low confidence:** user-generated content such as forums, social posts and free blog platforms, where anyone can publish without review.
 
-Important claims backed only by low-confidence sources are flagged. Recency is considered too: an outdated source for a fast-changing figure gets flagged.
+Important claims backed only by low-confidence sources are flagged, and the verification summary counts sources of every kind. Recency is considered too: an outdated source for a fast-changing figure gets flagged.
 
 ### 10.5 Verification outcomes
 

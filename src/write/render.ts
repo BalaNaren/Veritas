@@ -46,7 +46,7 @@ export function renderMarkdown(r: ReportInput): string {
       const c = bySeq.get(seq)!;
       const s = c.sourceId ? bySource.get(c.sourceId) : undefined;
       const label = s ? `${s.title ? oneLine(s.title) : s.finalUrl} — ${s.finalUrl}` : (c.url ?? 'unknown source');
-      const tags = s ? `${s.quality === 'unrated' ? 'unrated source' : `${s.quality} source`}, fetched ${s.fetchedAt.slice(0, 10)}${s.publishedAt ? `, dated ${s.publishedAt.slice(0, 10)}` : ''}` : '';
+      const tags = s ? `${s.quality === 'unrated' ? 'unrated source' : s.quality === 'low' ? 'low-confidence source' : `${s.quality} source`}, fetched ${s.fetchedAt.slice(0, 10)}${s.publishedAt ? `, dated ${s.publishedAt.slice(0, 10)}` : ''}` : '';
       out.push(`${n}. ${label}${tags ? ` (${tags})` : ''}`, `   > ${oneLine(c.quote ?? '')}`);
       if (c.status === 'flagged') out.push(`   ⚠ Flagged: ${c.reason ?? 'see verification summary'}`);
     }
@@ -60,7 +60,7 @@ export function renderMarkdown(r: ReportInput): string {
   out.push(`- ⚠ Flagged: ${sum.flagged}${reasonList(sum.flaggedReasons)}`);
   out.push(`- ✗ Removed: ${sum.removed}${reasonList(sum.removedReasons)}`);
   out.push(`- ◇ Analysis sentences: ${r.analysisSentences} (labelled as reasoning, not sourced fact)`);
-  out.push(`- Sources used: ${sum.sources.total} (${sum.sources.primary} primary · ${sum.sources.secondary} secondary · ${sum.sources.unrated} unrated)`);
+  out.push(`- Sources used: ${sum.sources.total} (${sum.sources.primary} primary · ${sum.sources.secondary} secondary · ${sum.sources.unrated} unrated · ${sum.sources.low} low-confidence)`);
   if (sum.notChecked) out.push(`- Not checked: ${sum.notChecked} (checking stopped before they were reached)`);
   if (r.removedSentences.length) out.push(`- Sentences removed from the draft for lacking a source: ${r.removedSentences.length}`);
   out.push('', '"Confirmed" means the cited page was fetched by Veritas, the quote is on it, the numbers match and an independent checker agreed the quote supports the claim. It does not prove the page itself is correct.');

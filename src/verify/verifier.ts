@@ -25,7 +25,7 @@ export interface VerificationSummary {
   removed: number;
   analysis: number;
   notChecked: number;
-  sources: { total: number; primary: number; secondary: number; unrated: number };
+  sources: { total: number; primary: number; secondary: number; unrated: number; low: number };
   /** Plain-language reasons, grouped for the summary line. */
   flaggedReasons: Record<string, number>;
   removedReasons: Record<string, number>;
@@ -45,6 +45,12 @@ function overlap(a: Set<string>, b: Set<string>): number {
   let shared = 0;
   for (const w of a) if (b.has(w)) shared++;
   return shared / Math.min(a.size, b.size);
+}
+
+/** A year the claim adds is fine when it is the year the page itself says it was published. */
+function unexplainedContext<T extends { value: number; raw: string }>(missing: readonly T[], source: SourceRow): T[] {
+  const year = source.publishedAt ? new Date(source.publishedAt).getUTCFullYear() : NaN;
+  return missing.filter((n) => !(Number.isFinite(year) && /^\d{4}$/.test(n.raw) && n.value === year));
 }
 
 const pass = (step: string, detail: string): CheckResult => ({ step, passed: true, detail });
@@ -93,8 +99,8 @@ async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: rea
     checks.push(fail('numbers', `The claim states ${list}, which the quote does not contain`));
     if (claim.type === 'number') return done('removed', `Number not in the quote: ${list}`, source, match.start!, match.end!);
     numbersReason = `Figures not in the quote: ${list}`;
-  } else if (nums.contextMissing.length) {
-    const list = nums.contextMissing.map((m) => m.raw).join(', ');
+  } else if (unexplainedContext(nums.contextMissing, source).length) {
+    const list = unexplainedContext(nums.contextMissing, source).map((m) => m.raw).join(', ');
     checks.push(fail('numbers', `The claim gives ${list} as context, but the quote does not name it`));
     numbersReason = `Date or year not in the quote: ${list}`;
   } else if (nums.claimNumbers.length) {
@@ -116,7 +122,7 @@ async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: rea
   if (numbersReason) flags.push(numbersReason);
 
   // Source quality and age.
-  if (claim.important && source.quality === 'unrated') flags.push('Important claim backed only by a source that is not on the recognised lists');
+  if (claim.important && source.quality === 'low') flags.push('Important claim backed only by user-generated content');
   const age = ageInDays(source.publishedAt, o.now);
   if (support.timeSensitive && age !== null && age > STALE_NUMBER_DAYS) flags.push(`Source is ${Math.floor(age / 365)} years old for a figure that may have changed`);
 
@@ -202,6 +208,7 @@ export function summarize(evidence: EvidenceStore, taskId: string, costUsd = 0):
       primary: usedSources.filter((s) => s.quality === 'primary').length,
       secondary: usedSources.filter((s) => s.quality === 'secondary').length,
       unrated: usedSources.filter((s) => s.quality === 'unrated').length,
+      low: usedSources.filter((s) => s.quality === 'low').length,
     },
     flaggedReasons: reasons('flagged'), removedReasons: reasons('removed'), costUsd,
   };

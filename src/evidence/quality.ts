@@ -1,4 +1,5 @@
-export type SourceQuality = 'primary' | 'secondary' | 'unrated';
+/** `unrated` means "not on the recognised lists"; `low` means user-generated content (forums, social posts, free blog platforms). */
+export type SourceQuality = 'primary' | 'secondary' | 'unrated' | 'low';
 
 export interface QualityRating {
   quality: SourceQuality;
@@ -21,6 +22,13 @@ const SECONDARY_DOMAINS = [
   'scientificamerican.com', 'newscientist.com', 'hbr.org', 'mckinsey.com', 'statista.com', 'pewresearch.org',
 ];
 
+/** Sites where anyone can publish without editorial review. */
+const LOW_DOMAINS = [
+  'reddit.com', 'quora.com', 'medium.com', 'substack.com', 'blogspot.com', 'wordpress.com', 'tumblr.com', 'facebook.com', 'x.com',
+  'twitter.com', 'tiktok.com', 'instagram.com', 'pinterest.com', 'fandom.com', 'wikia.com', 'answers.com', 'yahoo.com/answers',
+  'stackexchange.com', 'stackoverflow.com', 'linkedin.com', 'youtube.com', 'quora.com', 'blogger.com', 'wixsite.com', 'weebly.com',
+];
+
 const matches = (host: string, domain: string): boolean => host === domain || host.endsWith(`.${domain}`);
 
 /** Rate a source from its address alone. "unrated" means "not on the recognised lists", not "bad". */
@@ -35,6 +43,8 @@ export function rateSource(url: string): QualityRating {
   }
   const primary = PRIMARY_DOMAINS.find((d) => matches(host, d));
   if (primary) return { quality: 'primary', reason: `Official or primary-data publisher (${primary})` };
+  const low = LOW_DOMAINS.find((d) => matches(host, d));
+  if (low) return { quality: 'low', reason: `User-generated content (${low}); anyone can publish there without review` };
   const secondary = SECONDARY_DOMAINS.find((d) => matches(host, d));
   if (secondary) return { quality: 'secondary', reason: `Established news, journal or reference publisher (${secondary})` };
   return { quality: 'unrated', reason: `${host} is not on the recognised lists` };

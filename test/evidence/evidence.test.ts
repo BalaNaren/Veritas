@@ -79,7 +79,7 @@ describe('rateSource', () => {
     ['https://www.nasa.gov/x', 'primary'], ['https://www.cdc.gov/y', 'primary'], ['https://ocw.mit.edu/z', 'primary'],
     ['https://www.ons.gov.uk/a', 'primary'], ['https://www.ox.ac.uk/a', 'primary'], ['https://ec.europa.eu/a', 'primary'],
     ['https://arxiv.org/abs/1', 'primary'], ['https://www.reuters.com/a', 'secondary'], ['https://en.wikipedia.org/wiki/Moon', 'secondary'],
-    ['https://myblog.example.com/post', 'unrated'], ['https://nasa.gov.evil.com/a', 'unrated'], ['https://notnasa.gov.example/a', 'unrated'], ['nonsense', 'unrated'],
+    ['https://myblog.example.com/post', 'unrated'], ['https://www.reddit.com/r/x', 'low'], ['https://someone.substack.com/p/1', 'low'], ['https://nasa.gov.evil.com/a', 'unrated'], ['https://notnasa.gov.example/a', 'unrated'], ['nonsense', 'unrated'],
   ])('%s is %s', (url, expected) => expect(rateSource(url).quality).toBe(expected));
 });
 
