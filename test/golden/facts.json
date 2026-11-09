@@ -1,0 +1,479 @@
+{
+ "note": "Synthetic passages written for testing. Figures are fixtures, not real-world claims.",
+ "snapshots": {
+  "moon": {
+   "title": "Notes on the Moon's orbit",
+   "url": "https://reference.example/moon",
+   "text": "The Moon travels around Earth on an elliptical path. Its average distance from Earth is 384,400 kilometres. At its closest point the distance falls to about 363,300 kilometres. One full orbit relative to the stars takes 27.3 days. The cycle of phases is longer, at 29.5 days, because Earth moves around the Sun during each orbit. The Moon is tidally locked, so the same side always faces Earth. Its diameter is roughly one quarter of Earth's diameter."
+  },
+  "battery": {
+   "title": "Battery market review 2023",
+   "url": "https://market.example/battery",
+   "text": "The global electric vehicle battery market was valued at 40 billion dollars in 2023. Lithium iron phosphate cells made up 41 percent of cells installed in new vehicles that year. China produced 77 percent of all battery cells sold worldwide. Average pack prices fell 14 percent compared with 2022. Demand for cells is projected to triple by 2030 under the stated policy scenario. Recycling met under 2 percent of material demand in 2023."
+  },
+  "photo": {
+   "title": "How plants make food",
+   "url": "https://science.example/photosynthesis",
+   "text": "Photosynthesis takes place mainly in the chloroplasts of leaf cells. Chlorophyll absorbs red and blue light most strongly and reflects green light. During the light reactions, water is split and oxygen is released. The Calvin cycle then uses carbon dioxide to build sugars. A typical leaf converts roughly 1 percent of the sunlight it receives into stored chemical energy. Algae and cyanobacteria also perform photosynthesis."
+  },
+  "rome": {
+   "title": "The Roman Empire in brief",
+   "url": "https://history.example/rome",
+   "text": "Augustus became the first Roman emperor in 27 BC. The empire reached its greatest territorial extent under Trajan in 117 AD. At that point it covered about 5 million square kilometres. The population is estimated at between 50 and 90 million people. In 212 AD an edict extended citizenship to nearly all free inhabitants. The western half of the empire ended in 476 AD when its last emperor was deposed."
+  },
+  "solar": {
+   "title": "Solar power capacity report",
+   "url": "https://energy.example/solar",
+   "text": "Global installed solar capacity passed 1,400 gigawatts at the end of 2023. A record 345 gigawatts were added during the year. Solar supplied 5.5 percent of global electricity generation. Utility-scale projects made up 60 percent of new installations. The cost of electricity from new utility solar fell 89 percent between 2010 and 2023. Capacity grew fastest in China, which added more than the rest of the world combined."
+  },
+  "coffee": {
+   "title": "Coffee production overview",
+   "url": "https://agri.example/coffee",
+   "text": "Brazil is the largest coffee producer, supplying about 37 percent of world output. Vietnam ranks second, mostly growing the robusta species. Arabica accounts for roughly 60 percent of global production. Coffee plants usually need 3 to 4 years before the first harvest. World output in the 2022 marketing year was 168 million bags of 60 kilograms. Frost in 2021 damaged a large share of Brazilian plantings."
+  },
+  "internet": {
+   "title": "A short history of the internet",
+   "url": "https://tech.example/internet",
+   "text": "The first message over ARPANET was sent in 1969 between two universities. The TCP/IP protocols were adopted by ARPANET on 1 January 1983. Tim Berners-Lee proposed the World Wide Web at CERN in 1989. The first web browser to gain wide use, Mosaic, appeared in 1993. By 2023 about 5.4 billion people, or 67 percent of the world, were online. The domain name system translates names into numeric addresses."
+  },
+  "sleep": {
+   "title": "Sleep and health summary",
+   "url": "https://health.example/sleep",
+   "text": "Adults are advised to sleep 7 or more hours per night. About one in three adults reports sleeping fewer than 7 hours on a regular basis. Short sleep is associated with higher rates of obesity and diabetes. A single night of poor sleep can reduce attention the next day. Sleep needs are higher in teenagers, who are advised to sleep 8 to 10 hours. The studies described are observational and do not prove cause."
+  }
+ },
+ "facts": [
+  {
+   "source": "moon",
+   "quote": "Its average distance from Earth is 384,400 kilometres.",
+   "supported": "The Moon is on average 384,400 km from Earth.",
+   "stretched": "The Moon has always been exactly 384,400 km from Earth.",
+   "contradicted": "The Moon is on average closer to Earth than 100,000 km.",
+   "fake": "The Moon sits at an average distance of 384,400 kilometres, as measured in 1969.",
+   "wrongNumber": "The Moon is on average 400,000 km from Earth."
+  },
+  {
+   "source": "moon",
+   "quote": "At its closest point the distance falls to about 363,300 kilometres.",
+   "supported": "At its nearest the Moon is about 363,300 km away.",
+   "stretched": "The Moon's closest approach is the reason tides are strongest worldwide every month.",
+   "contradicted": "The Moon never comes closer than its average distance.",
+   "fake": "At its closest point the Moon approaches to within 350,000 kilometres of Earth.",
+   "wrongNumber": "At its nearest the Moon is about 360,000 km away."
+  },
+  {
+   "source": "moon",
+   "quote": "One full orbit relative to the stars takes 27.3 days.",
+   "supported": "The Moon completes one orbit relative to the stars in 27.3 days.",
+   "stretched": "Every orbit of the Moon takes precisely the same time down to the second.",
+   "contradicted": "One orbit relative to the stars takes longer than the cycle of phases.",
+   "fake": "One full orbit relative to the distant stars takes 28 days exactly.",
+   "wrongNumber": "The Moon completes one orbit relative to the stars in 29.3 days."
+  },
+  {
+   "source": "moon",
+   "quote": "The cycle of phases is longer, at 29.5 days, because Earth moves around the Sun during each orbit.",
+   "supported": "The cycle of lunar phases lasts 29.5 days because Earth moves around the Sun during each orbit.",
+   "stretched": "The phase cycle is longer because the Moon slows down as it ages.",
+   "contradicted": "The cycle of phases is shorter than one orbit relative to the stars.",
+   "fake": "The cycle of phases lasts 31 days because of the Moon's changing speed.",
+   "wrongNumber": "The cycle of lunar phases lasts 30.5 days because Earth moves around the Sun during each orbit."
+  },
+  {
+   "source": "moon",
+   "quote": "The Moon is tidally locked, so the same side always faces Earth.",
+   "supported": "The same side of the Moon always faces Earth because it is tidally locked.",
+   "stretched": "The far side of the Moon is permanently dark.",
+   "contradicted": "Both sides of the Moon take turns facing Earth.",
+   "fake": "The Moon is tidally locked, which is why astronauts have never seen the far side.",
+   "wrongNumber": null
+  },
+  {
+   "source": "moon",
+   "quote": "Its diameter is roughly one quarter of Earth's diameter.",
+   "supported": "The Moon's diameter is about a quarter of Earth's.",
+   "stretched": "The Moon is the largest moon in the solar system relative to any planet.",
+   "contradicted": "The Moon's diameter is about twice Earth's diameter.",
+   "fake": "The Moon's diameter is roughly one third of Earth's diameter.",
+   "wrongNumber": null
+  },
+  {
+   "source": "battery",
+   "quote": "The global electric vehicle battery market was valued at 40 billion dollars in 2023.",
+   "supported": "The global EV battery market was worth 40 billion dollars in 2023.",
+   "stretched": "The EV battery market is the largest industrial market in the world.",
+   "contradicted": "The global EV battery market was worth less than 1 billion dollars in 2023.",
+   "fake": "The global electric vehicle battery market reached 65 billion dollars in 2023.",
+   "wrongNumber": "The global EV battery market was worth 55 billion dollars in 2023."
+  },
+  {
+   "source": "battery",
+   "quote": "Lithium iron phosphate cells made up 41 percent of cells installed in new vehicles that year.",
+   "supported": "Lithium iron phosphate cells were 41 percent of cells installed in new vehicles in 2023.",
+   "stretched": "Lithium iron phosphate cells are safer than every other battery type.",
+   "contradicted": "Lithium iron phosphate cells were almost never used in new vehicles in 2023.",
+   "fake": "Lithium iron phosphate cells made up a majority of cells in new vehicles in 2023.",
+   "wrongNumber": "Lithium iron phosphate cells were 51 percent of cells installed in new vehicles in 2023."
+  },
+  {
+   "source": "battery",
+   "quote": "China produced 77 percent of all battery cells sold worldwide.",
+   "supported": "China produced 77 percent of battery cells sold worldwide.",
+   "stretched": "China's dominance in cells will continue for the next fifty years.",
+   "contradicted": "China produced a small minority of the battery cells sold worldwide.",
+   "fake": "China produced three quarters of all cells, according to the customs office.",
+   "wrongNumber": "China produced 87 percent of battery cells sold worldwide."
+  },
+  {
+   "source": "battery",
+   "quote": "Average pack prices fell 14 percent compared with 2022.",
+   "supported": "Average battery pack prices dropped 14 percent versus 2022.",
+   "stretched": "Pack prices fell because manufacturers cut safety standards.",
+   "contradicted": "Average pack prices rose compared with 2022.",
+   "fake": "Average pack prices fell 14 percent, the biggest drop on record.",
+   "wrongNumber": "Average battery pack prices dropped 24 percent versus 2022."
+  },
+  {
+   "source": "battery",
+   "quote": "Demand for cells is projected to triple by 2030 under the stated policy scenario.",
+   "supported": "Under the stated policy scenario, cell demand is projected to triple by 2030.",
+   "stretched": "Cell demand will certainly triple by 2030.",
+   "contradicted": "Demand for cells is projected to shrink by 2030 under the stated policy scenario.",
+   "fake": "Demand for cells is projected to quadruple by 2030 under all scenarios.",
+   "wrongNumber": "Under the stated policy scenario, cell demand is projected to grow 5-fold by 2030."
+  },
+  {
+   "source": "battery",
+   "quote": "Recycling met under 2 percent of material demand in 2023.",
+   "supported": "Recycling supplied less than 2 percent of material demand in 2023.",
+   "stretched": "Recycling is economically pointless.",
+   "contradicted": "Recycling met most of the material demand in 2023.",
+   "fake": "Recycling met 2 percent of material demand in 2023 in Europe alone.",
+   "wrongNumber": "Recycling supplied less than 12 percent of material demand in 2023."
+  },
+  {
+   "source": "photo",
+   "quote": "Photosynthesis takes place mainly in the chloroplasts of leaf cells.",
+   "supported": "Photosynthesis happens mostly in the chloroplasts of leaf cells.",
+   "stretched": "Photosynthesis only ever happens in leaves.",
+   "contradicted": "Photosynthesis takes place mainly in the roots of a plant.",
+   "fake": "Photosynthesis takes place mainly in the mitochondria of leaf cells.",
+   "wrongNumber": null
+  },
+  {
+   "source": "photo",
+   "quote": "Chlorophyll absorbs red and blue light most strongly and reflects green light.",
+   "supported": "Chlorophyll absorbs red and blue light most strongly while reflecting green.",
+   "stretched": "Chlorophyll is the reason the sky is blue.",
+   "contradicted": "Chlorophyll absorbs green light most strongly.",
+   "fake": "Chlorophyll absorbs ultraviolet light most strongly and reflects green light.",
+   "wrongNumber": null
+  },
+  {
+   "source": "photo",
+   "quote": "During the light reactions, water is split and oxygen is released.",
+   "supported": "Water is split and oxygen released in the light reactions.",
+   "stretched": "All oxygen in the atmosphere comes from the light reactions in forests.",
+   "contradicted": "Oxygen is consumed rather than released in the light reactions.",
+   "fake": "During the light reactions, carbon dioxide is split and oxygen is released.",
+   "wrongNumber": null
+  },
+  {
+   "source": "photo",
+   "quote": "The Calvin cycle then uses carbon dioxide to build sugars.",
+   "supported": "The Calvin cycle uses carbon dioxide to build sugars.",
+   "stretched": "The Calvin cycle is the most efficient chemical process known.",
+   "contradicted": "The Calvin cycle releases carbon dioxide instead of using it.",
+   "fake": "The Calvin cycle then uses nitrogen to build proteins.",
+   "wrongNumber": null
+  },
+  {
+   "source": "photo",
+   "quote": "A typical leaf converts roughly 1 percent of the sunlight it receives into stored chemical energy.",
+   "supported": "A typical leaf stores about 1 percent of the sunlight it receives as chemical energy.",
+   "stretched": "Photosynthesis is so inefficient that solar panels are always better.",
+   "contradicted": "A typical leaf converts most of the sunlight it receives into stored energy.",
+   "fake": "A typical leaf converts roughly 30 percent of the sunlight it receives into stored chemical energy.",
+   "wrongNumber": "A typical leaf stores about 11 percent of the sunlight it receives as chemical energy."
+  },
+  {
+   "source": "photo",
+   "quote": "Algae and cyanobacteria also perform photosynthesis.",
+   "supported": "Algae and cyanobacteria carry out photosynthesis too.",
+   "stretched": "Algae produce more oxygen than all land plants together.",
+   "contradicted": "Algae and cyanobacteria cannot perform photosynthesis.",
+   "fake": "Algae and fungi also perform photosynthesis.",
+   "wrongNumber": null
+  },
+  {
+   "source": "rome",
+   "quote": "Augustus became the first Roman emperor in 27 BC.",
+   "supported": "Augustus became the first Roman emperor in 27 BC.",
+   "stretched": "Augustus was the most beloved ruler Rome ever had.",
+   "contradicted": "Augustus became the first Roman emperor after 100 AD.",
+   "fake": "Augustus became the first Roman emperor in 31 BC after a naval victory.",
+   "wrongNumber": "Augustus became the first Roman emperor in 17 BC."
+  },
+  {
+   "source": "rome",
+   "quote": "The empire reached its greatest territorial extent under Trajan in 117 AD.",
+   "supported": "The empire was at its largest under Trajan in 117 AD.",
+   "stretched": "Trajan's conquests caused the later collapse of the empire.",
+   "contradicted": "The empire reached its greatest extent under Augustus.",
+   "fake": "The empire reached its greatest territorial extent under Hadrian in 130 AD.",
+   "wrongNumber": "The empire was at its largest under Trajan in 127 AD."
+  },
+  {
+   "source": "rome",
+   "quote": "At that point it covered about 5 million square kilometres.",
+   "supported": "At its peak the empire covered around 5 million square kilometres.",
+   "stretched": "That area was larger than any empire before or since.",
+   "contradicted": "At its peak the empire covered under one million square kilometres.",
+   "fake": "At that point it covered about 8 million square kilometres of land and sea.",
+   "wrongNumber": "At its peak the empire covered around 6 million square kilometres."
+  },
+  {
+   "source": "rome",
+   "quote": "The population is estimated at between 50 and 90 million people.",
+   "supported": "Estimates put the empire's population between 50 and 90 million.",
+   "stretched": "A third of all people alive at the time lived in the empire.",
+   "contradicted": "The population is estimated to have been under one million people.",
+   "fake": "The population is estimated at between 5 and 9 million people.",
+   "wrongNumber": "Estimates put the empire's population between 30 and 90 million."
+  },
+  {
+   "source": "rome",
+   "quote": "In 212 AD an edict extended citizenship to nearly all free inhabitants.",
+   "supported": "An edict in 212 AD gave citizenship to almost all free inhabitants.",
+   "stretched": "Citizenship ended all inequality in the empire.",
+   "contradicted": "In 212 AD citizenship was taken away from most inhabitants.",
+   "fake": "In 212 AD an edict extended citizenship to every inhabitant including slaves.",
+   "wrongNumber": "An edict in 112 AD gave citizenship to almost all free inhabitants."
+  },
+  {
+   "source": "rome",
+   "quote": "The western half of the empire ended in 476 AD when its last emperor was deposed.",
+   "supported": "The western empire ended in 476 AD with the deposition of its last emperor.",
+   "stretched": "The fall of the west was caused by lead poisoning.",
+   "contradicted": "The western half of the empire ended before 300 AD.",
+   "fake": "The western half of the empire ended in 476 AD when its last emperor was killed in battle.",
+   "wrongNumber": "The western empire ended in 576 AD with the deposition of its last emperor."
+  },
+  {
+   "source": "solar",
+   "quote": "Global installed solar capacity passed 1,400 gigawatts at the end of 2023.",
+   "supported": "Installed solar capacity worldwide exceeded 1,400 GW by the end of 2023.",
+   "stretched": "Solar is now the biggest source of power on Earth.",
+   "contradicted": "Global installed solar capacity was below 100 gigawatts at the end of 2023.",
+   "fake": "Global installed solar capacity passed 2,000 gigawatts at the end of 2023.",
+   "wrongNumber": "Installed solar capacity worldwide exceeded 1,700 GW by the end of 2023."
+  },
+  {
+   "source": "solar",
+   "quote": "A record 345 gigawatts were added during the year.",
+   "supported": "A record 345 GW of solar was added in 2023.",
+   "stretched": "The 2023 additions will never be matched.",
+   "contradicted": "Fewer gigawatts were added in 2023 than in any earlier year.",
+   "fake": "A record 345 gigawatts were added in the first half of the year.",
+   "wrongNumber": "A record 445 GW of solar was added in 2023."
+  },
+  {
+   "source": "solar",
+   "quote": "Solar supplied 5.5 percent of global electricity generation.",
+   "supported": "Solar provided 5.5 percent of the world's electricity.",
+   "stretched": "Solar will replace coal within five years.",
+   "contradicted": "Solar supplied over half of global electricity generation.",
+   "fake": "Solar supplied 5.5 percent of global electricity generation, up from 1 percent in 2015.",
+   "wrongNumber": "Solar provided 15.5 percent of the world's electricity."
+  },
+  {
+   "source": "solar",
+   "quote": "Utility-scale projects made up 60 percent of new installations.",
+   "supported": "Utility-scale projects were 60 percent of new solar installations.",
+   "stretched": "Rooftop solar is not worth installing.",
+   "contradicted": "Utility-scale projects made up a small minority of new installations.",
+   "fake": "Utility-scale projects made up 60 percent of new installations in Europe.",
+   "wrongNumber": "Utility-scale projects were 80 percent of new solar installations."
+  },
+  {
+   "source": "solar",
+   "quote": "The cost of electricity from new utility solar fell 89 percent between 2010 and 2023.",
+   "supported": "New utility solar electricity became 89 percent cheaper between 2010 and 2023.",
+   "stretched": "Solar is now the cheapest energy in every country.",
+   "contradicted": "The cost of electricity from new utility solar rose between 2010 and 2023.",
+   "fake": "The cost of electricity from new utility solar fell 89 percent between 2000 and 2023.",
+   "wrongNumber": "New utility solar electricity became 99 percent cheaper between 2010 and 2023."
+  },
+  {
+   "source": "solar",
+   "quote": "Capacity grew fastest in China, which added more than the rest of the world combined.",
+   "supported": "China added more solar capacity than the rest of the world combined.",
+   "stretched": "China will own most of the world's solar panels by 2030.",
+   "contradicted": "China added less solar capacity than any other major country.",
+   "fake": "Capacity grew fastest in India, which added more than the rest of the world combined.",
+   "wrongNumber": null
+  },
+  {
+   "source": "coffee",
+   "quote": "Brazil is the largest coffee producer, supplying about 37 percent of world output.",
+   "supported": "Brazil produces about 37 percent of the world's coffee.",
+   "stretched": "Brazil produces the best coffee in the world.",
+   "contradicted": "Brazil produces only a tiny fraction of the world's coffee.",
+   "fake": "Brazil is the largest coffee producer, supplying about 47 percent of world output.",
+   "wrongNumber": "Brazil produces about 27 percent of the world's coffee."
+  },
+  {
+   "source": "coffee",
+   "quote": "Vietnam ranks second, mostly growing the robusta species.",
+   "supported": "Vietnam is the second-largest producer and grows mostly robusta.",
+   "stretched": "Robusta is a lower quality coffee than arabica.",
+   "contradicted": "Vietnam ranks second, mostly growing the arabica species.",
+   "fake": "Vietnam ranks third, mostly growing the robusta species.",
+   "wrongNumber": null
+  },
+  {
+   "source": "coffee",
+   "quote": "Arabica accounts for roughly 60 percent of global production.",
+   "supported": "Arabica makes up about 60 percent of global coffee production.",
+   "stretched": "Arabica will disappear because of climate change.",
+   "contradicted": "Arabica accounts for a small minority of global production.",
+   "fake": "Arabica accounts for roughly 90 percent of global production.",
+   "wrongNumber": "Arabica makes up about 80 percent of global coffee production."
+  },
+  {
+   "source": "coffee",
+   "quote": "Coffee plants usually need 3 to 4 years before the first harvest.",
+   "supported": "Coffee plants take 3 to 4 years to produce a first harvest.",
+   "stretched": "Coffee farming is not profitable for small farmers.",
+   "contradicted": "Coffee plants can be harvested within a few weeks of planting.",
+   "fake": "Coffee plants usually need 10 years before the first harvest.",
+   "wrongNumber": "Coffee plants take 5 to 6 years to produce a first harvest."
+  },
+  {
+   "source": "coffee",
+   "quote": "World output in the 2022 marketing year was 168 million bags of 60 kilograms.",
+   "supported": "Global coffee output in the 2022 marketing year was 168 million 60-kilogram bags.",
+   "stretched": "World coffee output is growing every year.",
+   "contradicted": "World output in the 2022 marketing year was under 10 million bags.",
+   "fake": "World output in the 2022 marketing year was 168 million bags of 70 kilograms.",
+   "wrongNumber": "Global coffee output in the 2022 marketing year was 186 million 60-kilogram bags."
+  },
+  {
+   "source": "coffee",
+   "quote": "Frost in 2021 damaged a large share of Brazilian plantings.",
+   "supported": "A 2021 frost damaged many of Brazil's coffee plantings.",
+   "stretched": "The 2021 frost doubled coffee prices worldwide.",
+   "contradicted": "Brazilian plantings were unaffected by frost in 2021.",
+   "fake": "A 2019 frost damaged a large share of Brazilian plantings.",
+   "wrongNumber": null
+  },
+  {
+   "source": "internet",
+   "quote": "The first message over ARPANET was sent in 1969 between two universities.",
+   "supported": "The first ARPANET message was sent in 1969 between two universities.",
+   "stretched": "ARPANET was created to survive a nuclear war.",
+   "contradicted": "The first message over ARPANET was sent after 1990.",
+   "fake": "The first message over ARPANET was sent in 1971 between two companies.",
+   "wrongNumber": "The first ARPANET message was sent in 1979 between two universities."
+  },
+  {
+   "source": "internet",
+   "quote": "The TCP/IP protocols were adopted by ARPANET on 1 January 1983.",
+   "supported": "ARPANET adopted TCP/IP on 1 January 1983.",
+   "stretched": "TCP/IP is the only protocol that could ever have worked.",
+   "contradicted": "ARPANET adopted TCP/IP before 1970.",
+   "fake": "ARPANET adopted TCP/IP on 1 January 1985 after a long dispute.",
+   "wrongNumber": "ARPANET adopted TCP/IP on 1 January 1993."
+  },
+  {
+   "source": "internet",
+   "quote": "Tim Berners-Lee proposed the World Wide Web at CERN in 1989.",
+   "supported": "Tim Berners-Lee proposed the Web at CERN in 1989.",
+   "stretched": "The Web was invented to sell products online.",
+   "contradicted": "Tim Berners-Lee proposed the World Wide Web at MIT.",
+   "fake": "Tim Berners-Lee proposed the World Wide Web at CERN in 1991 after leaving his post.",
+   "wrongNumber": "Tim Berners-Lee proposed the Web at CERN in 1999."
+  },
+  {
+   "source": "internet",
+   "quote": "The first web browser to gain wide use, Mosaic, appeared in 1993.",
+   "supported": "Mosaic, the first widely used web browser, appeared in 1993.",
+   "stretched": "Mosaic is the reason the Web became popular overnight.",
+   "contradicted": "Mosaic appeared before the World Wide Web was proposed.",
+   "fake": "Mosaic, the first web browser to gain wide use, appeared in 1995 as a paid product.",
+   "wrongNumber": "Mosaic, the first widely used web browser, appeared in 1983."
+  },
+  {
+   "source": "internet",
+   "quote": "By 2023 about 5.4 billion people, or 67 percent of the world, were online.",
+   "supported": "About 5.4 billion people, 67 percent of the world, were online by 2023.",
+   "stretched": "Internet access is now equal in every country.",
+   "contradicted": "By 2023 only a small share of people worldwide were online.",
+   "fake": "By 2023 about 5.4 billion people, or 97 percent of the world, were online.",
+   "wrongNumber": "By 2023 about 6.4 billion people, or 67 percent of the world, were online."
+  },
+  {
+   "source": "internet",
+   "quote": "The domain name system translates names into numeric addresses.",
+   "supported": "The domain name system maps names to numeric addresses.",
+   "stretched": "The domain name system is controlled by a single company.",
+   "contradicted": "The domain name system translates numeric addresses into passwords.",
+   "fake": "The domain name system translates names into numeric addresses using a single central file.",
+   "wrongNumber": null
+  },
+  {
+   "source": "sleep",
+   "quote": "Adults are advised to sleep 7 or more hours per night.",
+   "supported": "Adults should aim for at least 7 hours of sleep a night.",
+   "stretched": "Sleeping more than 9 hours is always unhealthy.",
+   "contradicted": "Adults are advised to sleep under 5 hours per night.",
+   "fake": "Adults are advised to sleep 7 or more hours per night, and 9 is ideal.",
+   "wrongNumber": "Adults are advised to sleep 9 or more hours per night."
+  },
+  {
+   "source": "sleep",
+   "quote": "About one in three adults reports sleeping fewer than 7 hours on a regular basis.",
+   "supported": "Roughly a third of adults regularly sleep less than 7 hours.",
+   "stretched": "Most people are chronically sleep deprived.",
+   "contradicted": "Almost no adults report sleeping fewer than 7 hours.",
+   "fake": "About one in two adults reports sleeping fewer than 7 hours on a regular basis.",
+   "wrongNumber": "About one in ten adults reports sleeping fewer than 6 hours on a regular basis."
+  },
+  {
+   "source": "sleep",
+   "quote": "Short sleep is associated with higher rates of obesity and diabetes.",
+   "supported": "Short sleep is linked with more obesity and diabetes.",
+   "stretched": "Short sleep causes obesity and diabetes.",
+   "contradicted": "Short sleep is associated with lower rates of obesity and diabetes.",
+   "fake": "Short sleep is associated with higher rates of obesity, diabetes and heart attacks.",
+   "wrongNumber": null
+  },
+  {
+   "source": "sleep",
+   "quote": "A single night of poor sleep can reduce attention the next day.",
+   "supported": "One poor night of sleep can lower attention the following day.",
+   "stretched": "One poor night of sleep permanently damages memory.",
+   "contradicted": "A single night of poor sleep improves attention the next day.",
+   "fake": "A single night of poor sleep can reduce attention for a full week.",
+   "wrongNumber": null
+  },
+  {
+   "source": "sleep",
+   "quote": "Sleep needs are higher in teenagers, who are advised to sleep 8 to 10 hours.",
+   "supported": "Teenagers need more sleep and are advised to get 8 to 10 hours.",
+   "stretched": "Teenagers sleep late because they are lazy.",
+   "contradicted": "Teenagers need less sleep than adults.",
+   "fake": "Sleep needs are higher in teenagers, who are advised to sleep 10 to 12 hours.",
+   "wrongNumber": "Teenagers need more sleep and are advised to get 6 to 8 hours."
+  },
+  {
+   "source": "sleep",
+   "quote": "The studies described are observational and do not prove cause.",
+   "supported": "The studies are observational and cannot prove cause.",
+   "stretched": "These studies show sleep loss is harmless.",
+   "contradicted": "The studies described are randomized trials that prove cause.",
+   "fake": "The studies described are observational but prove cause when pooled.",
+   "wrongNumber": null
+  }
+ ]
+}

@@ -22,7 +22,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean-check": "node scripts/clean-check.mjs",
     "test": "npm run clean-check && vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "eval:verify": "npm run build && node scripts/eval-verify.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

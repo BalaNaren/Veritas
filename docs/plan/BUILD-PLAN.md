@@ -219,8 +219,8 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 - [~] Renderers: Markdown done (citations → numbered sources with URL + quote, verification summary appended, "Assumptions" at top). DOCX (pinned `docx`) and PDF (pinned `pdfmake`) still to do.
 
 **7. Golden verification set** (`test/golden/`)
-- [ ] ~50 research questions + ~200 hand-labeled claims (supported / unsupported / contradicted, incl. deliberately wrong numbers and fake quotes) with stored source snapshots (offline).
-- [ ] `npm run eval:verify` reports checker accuracy (uses real checker model; manual run, costs money); code-only steps tested in CI.
+- [~] 238 labelled claims (supported, stretched, contradicted, fabricated quote, wrong number, invented source) over 8 synthetic source passages, stored offline in `test/golden/facts.json`. The ~50 end-to-end research questions are not built yet (they need live web access and a manual run).
+- [x] `npm run eval:verify` reports checker accuracy with the method and limits; first result in `docs/eval/verify-2026-11-08.md` (uses the real checker model; manual run, about $0.10). Code-only steps are tested in CI (`test/golden`).
 
 ### M2 exit criteria
 - Research reports pass the golden set with **zero invented sources** and **zero fabricated quotes** (code checks).

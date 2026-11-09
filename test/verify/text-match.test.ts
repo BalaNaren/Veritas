@@ -84,3 +84,10 @@ describe('checkNumbers', () => {
     expect(checkNumbers('The law took effect', 'anything').ok).toBe(true);
   });
 });
+
+describe('known limit: numbers written as words', () => {
+  it('are not compared by the code check (the independent checker has to catch them)', () => {
+    expect(checkNumbers('Demand will grow fivefold', 'Demand is projected to triple').ok).toBe(true);
+    expect(extractNumbers('one hundred and twelve')).toEqual([]);
+  });
+});
