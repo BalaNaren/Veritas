@@ -32,6 +32,9 @@
   },
   "dependencies": {
     "docx": "9.15.3",
+    "exceljs": "4.4.0",
+    "mammoth": "1.13.0",
+    "pdfjs-dist": "6.5.438",
     "pdfmake": "0.3.14"
   }
 }
