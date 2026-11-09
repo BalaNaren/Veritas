@@ -52,6 +52,7 @@ export function interpretPrompt(goal: string, instructions: string, code: string
 Rules:
 - Each finding is one plain statement. List in "keys" the result keys (copied exactly from the list below) that its numbers come from.
 - Every number in a finding must be copied from the values of the keys you list. You may round a value, and you may give a stored fraction as a percentage, but you must not calculate anything new: if a figure you need is not stored, leave it out and mention it in "notes".
+- Write each number the way it is stored, in the same unit. Do not rescale it: if a value is 3324.78 and the column is in thousands, write "3,324.78 thousand" or "3,324.78", not "3.3 million".
 - Words about direction (rose, fell, higher, lower) must match the signs and sizes of the stored values.
 - Mark a finding "important" if the answer depends on it.
 - For charts, list the PNG files that help, with a caption that states what the chart shows. Use only files from the list.

@@ -129,6 +129,12 @@ describe('numbers computed by code', () => {
   it.each([
     'Revenue fell 15% in the quarter.', 'Total revenue was $5.5 million.', 'The north region had 130 units.', 'Revenue fell 11.9%.', 'The share was 13%.',
   ])('rejects a figure the code did not produce: %s', (claim) => expect(checkNumbers(claim, stored, true).ok).toBe(false));
+  it('accepts a unit word that names the unit a stored value is already in', () => {
+    const q = 'total_2024_k: 4780.6\ngrowth_k: 1455.82';
+    expect(checkNumbers('Revenue was $4,780.6 thousand in 2024.', q, true).missing).toEqual([]);
+    expect(checkNumbers('Growth was 1,455.82k.', q, true).ok).toBe(true);
+    expect(checkNumbers('Revenue was $4,900 thousand.', q, true).ok).toBe(false);
+  });
   it('is strict for ordinary claims', () => {
     expect(checkNumbers('Revenue fell 12%.', 'revenue_change_pct: -11.84').ok).toBe(false);
   });

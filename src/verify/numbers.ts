@@ -77,7 +77,10 @@ export function stripLocators(text: string): string {
 export function matchesComputed(claim: FoundNumber, stored: FoundNumber): boolean {
   const half = (Math.pow(10, -claim.decimals) * claim.scale) / 2 + 1e-9 * Math.max(1, Math.abs(claim.value));
   const close = (a: number, b: number): boolean => Math.abs(Math.abs(a) - Math.abs(b)) <= half;
-  return close(claim.value, stored.value) || (claim.percent && close(claim.value, stored.value * 100));
+  // A unit word may just name the unit the stored value is already in ("3,324.78 thousand" for a column in thousands).
+  const digitsHalf = Math.pow(10, -claim.decimals) / 2 + 1e-9;
+  const sameDigits = claim.scale !== 1 && Math.abs(Math.abs(claim.value / claim.scale) - Math.abs(stored.value)) <= digitsHalf;
+  return close(claim.value, stored.value) || sameDigits || (claim.percent && close(claim.value, stored.value * 100));
 }
 
 /**
