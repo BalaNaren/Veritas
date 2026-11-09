@@ -134,18 +134,56 @@ function ansiToTspans(line) {
   return parts.join('');
 }
 
-function console_() {
-  const data = JSON.parse(readFileSync(join(root, 'docs/assets/recording-data.json'), 'utf8'));
+/** Draws a terminal recording from frames of the real live view. */
+function recording(spec) {
   const fmt = new OutputFormatter({ color: true });
+  const { loop: LOOP, hold: HOLD, tEnd, snap, events, cmd, final, id, title, footer } = spec;
+  const scale = (LOOP - HOLD) / tEnd;
+  const times = new Set([0]);
+  for (const e of events) times.add(e.t);
+  for (let t = 0; t < tEnd; t += 0.5 / scale) times.add(Math.round(t * 1000) / 1000);
+  const stamps = [...times].sort((a, b) => a - b);
+  const frames = stamps.map((t, i) => ({ start: t * scale, lines: buildFrame(snap(t), fmt, { width: 96, unicode: true, tick: i, elapsedMs: t * 1000 }) }));
+
+  const LH = 21, X = 34, Y0 = 118, W = 960;
+  const rows = Math.max(...frames.map((f) => f.lines.length)) + 3;
+  const H = Y0 + rows * LH + 34;
+  const only = process.env.ART_FRAME === undefined ? -1 : Number(process.env.ART_FRAME);
+  if (only >= 0) console.log(`frame ${only} of ${frames.length}`);
+  const groups = frames.map((f, i) => {
+    const end = i + 1 < frames.length ? frames[i + 1].start : LOOP;
+    const isLast = i === frames.length - 1;
+    const kt = [0, f.start / LOOP, end / LOOP, 1].map((k) => Math.min(1, Math.max(0, +k.toFixed(5))));
+    const body = f.lines.map((l, k) => `<text x="${X}" y="${Y0 + k * LH}" xml:space="preserve">${ansiToTspans(l)}</text>`).join('');
+    const tail = isLast ? final.map((l, k) => `<text x="${X}" y="${Y0 + (f.lines.length + 1 + k) * LH}" xml:space="preserve"><tspan fill="${k === 0 ? C.teal : C.muted}">${esc(l)}</tspan></text>`).join('') : '';
+    if (only >= 0) return i === only ? `<g>${body}${tail}</g>` : '';
+    return `<g opacity="0"><animate attributeName="opacity" calcMode="discrete" keyTimes="${kt.join(';')}" values="${isLast ? '0;1;1;1' : '0;1;0;0'}" dur="${LOOP}s" repeatCount="indefinite"/>${body}${tail}</g>`;
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(spec.label)}">
+<defs>${glow('g', 3)}</defs>
+<rect width="${W}" height="${H}" rx="14" fill="#0b1122" stroke="${C.line}" stroke-width="2"/>
+<rect width="${W}" height="44" rx="14" fill="#101a31"/><rect y="30" width="${W}" height="14" fill="#101a31"/>
+<circle cx="26" cy="22" r="6.5" fill="${C.coral}"/><circle cx="48" cy="22" r="6.5" fill="${C.amber}"/><circle cx="70" cy="22" r="6.5" fill="${C.teal}"/>
+<text x="${W / 2}" y="27" text-anchor="middle" font-family="${SANS}" font-size="14" letter-spacing="2" fill="#7f97b3">${esc(title)}</text>
+<g font-family="${MONO}" font-size="14.5">
+<text x="${X}" y="76" xml:space="preserve"><tspan fill="${C.teal}">$</tspan><tspan fill="${C.text}"> ${esc(cmd)}</tspan></text>
+${groups.join('\n')}
+</g>
+<text x="${W - 24}" y="${H - 14}" text-anchor="end" font-family="${SANS}" font-size="12" fill="#5d7088">${esc(footer)}</text>
+</svg>`;
+}
+
+function consoleData() {
+  const data = JSON.parse(readFileSync(join(root, 'docs/assets/recording-data.json'), 'utf8'));
   const ev = data.events;
   const at = (type) => ev.find((e) => e.type === type)?.t ?? 0;
   const tPlan = at('plan.created'), tFinished = at('subtask.finished'), tVerifyDone = at('verify.done'), tDone = at('task.done');
   const sub = data.subtasks[0];
   const claimTimes = ev.filter((e) => e.type === 'claim.verified').map((e) => e.t);
   const nClaims = claimTimes.length;
-  const afterTask = 0.0806826;                        // spent right after the task (recorded by the run)
-  const afterPlan = afterTask - sub.cost_usd;         // what planning cost, derived from the two recorded numbers
-  const base = { taskId: data.task.id, goal: data.task.goal, budgetUsd: data.task.budgetUsd, sources: { fetched: 0, failed: 0 }, tests: [] };
+  const afterTask = ev.find((e) => e.type === 'cost.updated').data.spentUsd;   // recorded by the run
+  const afterPlan = afterTask - sub.cost_usd;                                    // derived from two recorded numbers
+  const base = { taskId: data.task.id, goal: data.task.goal, budgetUsd: data.task.budgetUsd, tests: [] };
   const snap = (t) => {
     const status = t >= tDone ? 'done' : t >= tVerifyDone ? 'writing' : t >= tFinished ? 'verifying' : t >= at('task.running') ? 'running' : t >= tPlan ? 'planned' : 'draft';
     const spentUsd = t >= tDone ? data.task.spentUsd : t >= tFinished ? afterTask : t >= tPlan ? afterPlan : 0;
@@ -155,51 +193,156 @@ function console_() {
     const last = t >= tDone ? 'done' : t >= tVerifyDone ? 'checked: all claims confirmed; writing the report' : t >= tFinished ? 'collecting sources and checking every claim' : t >= at('subtask.started') ? `> t1 ${sub.title} (${sub.model})` : t >= tPlan ? 'plan ready: 1 task' : 'planning...';
     return { ...base, status, spentUsd, claims, subtasks, last, sources: { fetched: t >= at('file.read') ? 1 : 0, failed: 0 } };
   };
-
-  // Real seconds are compressed into a short loop; every real event and a steady spinner beat get a frame.
-  const LOOP = 15, HOLD = 3.5, scale = (LOOP - HOLD) / tDone;
-  const times = new Set([0]);
-  for (const e of ev) times.add(e.t);
-  for (let t = 0; t < tDone; t += 0.5 / scale) times.add(Math.round(t * 1000) / 1000);
-  const stamps = [...times].sort((a, b) => a - b);
-  const frames = stamps.map((t, i) => ({ start: t * scale, lines: buildFrame(snap(t), fmt, { width: 96, unicode: true, tick: i, elapsedMs: t * 1000 }) }));
-  const final = [`Done. Spent $${data.task.spentUsd.toFixed(2)} of $${data.task.budgetUsd.toFixed(2)}.`, 'Result saved to ~/.veritas/tasks/' + data.task.id + '/result.md'];
-
-  const LH = 21, X = 34, Y0 = 118, W = 960;
-  const rows = Math.max(...frames.map((f) => f.lines.length)) + 3;
-  const H = Y0 + rows * LH + 34;
-  const total = LOOP;
-  // Debug: ART_FRAME=n writes only frame n, still and fully visible, so the layout can be checked in a browser.
-  const only = process.env.ART_FRAME === undefined ? -1 : Number(process.env.ART_FRAME);
-  if (only >= 0) console.log(`frame ${only} of ${frames.length}`);
-  const groups = frames.map((f, i) => {
-    const end = i + 1 < frames.length ? frames[i + 1].start : total;
-    const isLast = i === frames.length - 1;
-    const kt = [0, f.start / total, end / total, 1].map((k) => Math.min(1, Math.max(0, +k.toFixed(5))));
-    const vals = isLast ? '0;1;1;1' : '0;1;0;0';
-    const body = f.lines.map((l, k) => `<text x="${X}" y="${Y0 + k * LH}" xml:space="preserve">${ansiToTspans(l)}</text>`).join('');
-    const tail = isLast ? final.map((l, k) => `<text x="${X}" y="${Y0 + (f.lines.length + 1 + k) * LH}" xml:space="preserve"><tspan fill="${k === 0 ? C.teal : C.muted}">${esc(l)}</tspan></text>`).join('') : '';
-    if (only >= 0) return i === only ? `<g>${body}${tail}</g>` : '';
-    return `<g opacity="0"><animate attributeName="opacity" calcMode="discrete" keyTimes="${kt.join(';')}" values="${vals}" dur="${total}s" repeatCount="indefinite"/>${body}${tail}</g>`;
+  return recording({
+    loop: 15, hold: 3.5, tEnd: tDone, snap, events: ev, id: data.task.id, label: 'A Veritas run in the terminal: planning, one analysis task, eight claims checked and confirmed, a cited report',
+    title: 'veritas — a real run, on a small sample file', cmd: 'veritas run "Which region\'s revenue grew fastest between 2023 and 2024…" --file sales.csv --budget 1.5',
+    final: [`Done. Spent $${data.task.spentUsd.toFixed(2)} of $${data.task.budgetUsd.toFixed(2)}.`, `Result saved to ~/.veritas/tasks/${data.task.id}/result.md`],
+    footer: `Recorded from a real run (${data.task.id}). Waiting time is shortened; every number shown was recorded.`,
   });
-  const cmd = 'veritas run "Which region\'s revenue grew fastest between 2023 and 2024…" --file sales.csv --budget 1.5';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="A Veritas run in the terminal: planning, one analysis task, eight claims checked and confirmed, a cited report">
-<defs>${glow('g', 3)}</defs>
-<rect width="${W}" height="${H}" rx="14" fill="#0b1122" stroke="${C.line}" stroke-width="2"/>
-<rect width="${W}" height="44" rx="14" fill="#101a31"/><rect y="30" width="${W}" height="14" fill="#101a31"/>
-<circle cx="26" cy="22" r="6.5" fill="${C.coral}"/><circle cx="48" cy="22" r="6.5" fill="${C.amber}"/><circle cx="70" cy="22" r="6.5" fill="${C.teal}"/>
-<text x="${W / 2}" y="27" text-anchor="middle" font-family="${SANS}" font-size="14" letter-spacing="2" fill="#7f97b3">veritas — a real run, on a small sample file</text>
-<g font-family="${MONO}" font-size="14.5">
-<text x="${X}" y="76" xml:space="preserve"><tspan fill="${C.teal}">$</tspan><tspan fill="${C.text}"> ${esc(cmd)}</tspan></text>
-${groups.join('\n')}
-</g>
-<text x="${W - 24}" y="${H - 14}" text-anchor="end" font-family="${SANS}" font-size="12" fill="#5d7088">Recorded from a real run (${esc(data.task.id)}). Waiting time is shortened; every number shown was recorded.</text>
+}
+
+function consoleCode() {
+  const data = JSON.parse(readFileSync(join(root, 'docs/assets/recording-code-data.json'), 'utf8'));
+  const ev = data.events;
+  const at = (type) => ev.find((e) => e.type === type)?.t ?? 0;
+  const tPlan = at('plan.created'), tBase = at('tests.baseline'), tStart = at('subtask.started'), tTests = at('tests.ran'), tDone = at('task.done');
+  const sub = data.subtasks[0];
+  const base = { taskId: data.task.id, goal: data.task.goal, budgetUsd: data.task.budgetUsd, claims: null, sources: { fetched: 0, failed: 0 } };
+  const snap = (t) => ({
+    ...base,
+    status: t >= tDone ? 'done' : t >= tStart ? 'running' : t >= tPlan ? 'planned' : 'draft',
+    spentUsd: t >= tTests ? data.task.spentUsd : 0,
+    subtasks: t >= tPlan ? [{ key: 't1', title: 'Make the change', status: t >= tTests ? 'done' : t >= tStart ? 'running' : 'pending', costUsd: t >= tTests ? sub.cost_usd : 0, model: t >= tStart ? sub.model : null, attempts: 1 }] : [],
+    tests: [...(t >= tBase ? [{ phase: 'before', passed: false }] : []), ...(t >= tTests ? [{ phase: 'round 1', passed: true }] : [])],
+    last: t >= tDone ? 'done' : t >= tTests ? 'tests passed round1' : t >= tStart ? '> t1 Make the change (sonnet)' : t >= tBase ? 'Tests before any change: failing' : t >= tPlan ? 'Working in a separate copy on a new branch' : 'planning...',
+  });
+  return recording({
+    loop: 11, hold: 3.5, tEnd: tDone, snap, events: ev, id: data.task.id, label: 'A Veritas coding task in the terminal: the tests fail before the change and pass after it',
+    title: 'veritas — a real coding run, on a tiny sample project', cmd: 'veritas code "Fix the bug in add() so the tests pass." --repo ~/projects/demo --test-cmd "node --test"',
+    final: [`Done. Spent $${data.task.spentUsd.toFixed(2)} of $${data.task.budgetUsd.toFixed(2)}.`, 'Your own folder was not touched. To keep the change: veritas apply ' + data.task.id],
+    footer: `Recorded from a real run (${data.task.id}). The agent worked in a separate copy; Veritas ran the tests itself.`,
+  });
+}
+
+// ---------------------------------------------------------------- section banners
+function chapter(n, line1, line2, tagline, labels, accent = C.teal) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 220" width="1280" height="220" role="img" aria-label="${esc(`${line1} ${line2}`)}">
+<defs>${glow('g', 5)}${grid('grid')}<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0d1730"/><stop offset="1" stop-color="#070b16"/></linearGradient></defs>
+<rect width="1280" height="220" rx="16" fill="url(#bg)" stroke="${C.line}"/><rect width="1280" height="220" rx="16" fill="url(#grid)" opacity=".5"/>
+<polygon points="1020,0 1280,0 1280,220 960,220" fill="#0e1a34"/>
+<path d="M40 30 H940 M40 30 V74" stroke="${accent}" stroke-width="3" fill="none" filter="url(#g)"/>
+<text x="62" y="62" font-family="${SANS}" font-size="16" letter-spacing="6" fill="${accent}">VERITAS / CHAPTER 0${n}</text>
+<text x="60" y="124" font-family="${SANS}" font-weight="800" font-size="52" letter-spacing="-.5" fill="${C.gray}">${esc(line1)}</text>
+<text x="60" y="176" font-family="${SANS}" font-weight="800" font-size="52" letter-spacing="-.5" fill="${accent}" filter="url(#g)">${esc(line2)}</text>
+<text x="64" y="205" font-family="${SANS}" font-size="17" fill="${C.muted}">${esc(tagline)}</text>
+<g font-family="${SANS}" font-size="15" letter-spacing="4" fill="#7f97b3">${labels.map((l, i) => `<text x="1000" y="${74 + i * 36}">0${i + 1} / ${esc(l)}</text>`).join('')}</g>
+<g transform="translate(1196 60)" fill="none" stroke="${accent}" stroke-width="3" opacity=".55"><circle r="26"/><circle r="26" stroke-dasharray="40 200" stroke-width="5" opacity="1"><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="${6 + n}s" repeatCount="indefinite"/></circle></g>
 </svg>`;
 }
 
-if (process.env.ART_FRAME !== undefined) { writeFileSync(process.env.ART_OUT ?? '/tmp/console-frame.svg', console_()); process.exit(0); }
+// ---------------------------------------------------------------- a real report, as a card
+function reportCard() {
+  const md = readFileSync(join(root, 'docs/assets/sample-report.md'), 'utf8');
+  const section = (name) => (md.split(new RegExp(`^## ${name}\\n`, 'm'))[1] ?? '').split(/^## /m)[0].trim();
+  const answer = section('Answer').split('\n\n')[0];
+  const rows = section('Revenue by region').split('\n').filter((l) => l.startsWith('|') && !/^\|[-|\s]+\|$/.test(l)).map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
+  const summary = section('Verification summary').split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2));
+  const wrap = (text, n) => { const out = []; let cur = ''; for (const w of text.split(' ')) { if ((cur + ' ' + w).trim().length > n) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); } if (cur) out.push(cur); return out; };
+  const colX = [60, 250, 480, 700, 960];
+  const W = 1280;
+  let y = 150;
+  const parts = [];
+  wrap(answer, 112).forEach((l, i) => parts.push(`<text x="60" y="${y + i * 30}" font-family="${SANS}" font-size="22" fill="${C.text}">${esc(l)}</text>`));
+  y += wrap(answer, 112).length * 30 + 22;
+  const tableTop = y;
+  rows.forEach((r, ri) => {
+    const head = ri === 0;
+    parts.push(`<rect x="44" y="${y - 24}" width="${W - 88}" height="40" fill="${head ? '#14223f' : ri % 2 ? '#0e1830' : '#0c1528'}"/>`);
+    r.forEach((c, ci) => parts.push(`<text x="${colX[ci]}" y="${y + 2}" font-family="${head ? SANS : MONO}" font-size="${head ? 15 : 18}" ${head ? `letter-spacing="1" fill="${C.muted}" font-weight="700"` : `fill="${ci === 0 ? C.text : '#cfe0f5'}"`}>${esc(head ? c.toUpperCase().replace(/ \(THOUSANDS\)/, ' (K)') : c)}</text>`));
+    y += 40;
+  });
+  y += 24;
+  const box = y;
+  const src = summary.find((l) => l.startsWith('Sources used'));
+  const stat = (x, color, big, small) => `<text x="${x}" y="${box + 90}" font-family="${SANS}" font-weight="800" font-size="46" fill="${color}">${big}</text><text x="${x}" y="${box + 118}" font-family="${SANS}" font-size="15" letter-spacing="2" fill="${C.muted}">${small}</text>`;
+  const num = (l) => (l.match(/\d+/) ?? ['0'])[0];
+  parts.push(`<rect x="44" y="${box}" width="${W - 88}" height="146" rx="16" fill="#0b1630" stroke="${C.teal}" stroke-opacity=".5" stroke-width="2"/>
+<text x="70" y="${box + 30}" font-family="${SANS}" font-size="14" letter-spacing="5" fill="${C.teal}">VERIFICATION SUMMARY</text>
+${stat(70, C.teal, num(summary.find((l) => /Confirmed/.test(l)) ?? ''), 'CONFIRMED')}${stat(300, C.amber, num(summary.find((l) => /Flagged/.test(l)) ?? ''), 'FLAGGED')}${stat(520, C.coral, num(summary.find((l) => /Removed/.test(l)) ?? ''), 'REMOVED')}${stat(740, C.cyan, num(summary.find((l) => /Claims checked/.test(l)) ?? ''), 'CLAIMS CHECKED')}
+<text x="980" y="${box + 78}" font-family="${SANS}" font-weight="700" font-size="20" fill="${C.text}">${esc((src ?? '').replace(/\s*\(.*$/, ''))}</text><text x="980" y="${box + 106}" font-family="${SANS}" font-size="16" fill="#b4c3da">${esc(((src ?? '').match(/\((.*)\)/) ?? [, ''])[1].split(' · ').slice(0, 2).join(' · '))}</text>`);
+  const H = box + 146 + 70;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="An excerpt of a real Veritas report: the answer, a table where every cell cites a claim, and the verification summary">
+<defs>${glow('g', 3)}${grid('grid')}</defs>
+<rect width="${W}" height="${H}" rx="18" fill="${C.bg}" stroke="${C.line}"/><rect width="${W}" height="${H}" rx="18" fill="url(#grid)" opacity=".4"/>
+<text x="60" y="52" font-family="${SANS}" font-size="15" letter-spacing="6" fill="${C.teal}">A REAL REPORT · EXCERPT</text>
+<text x="60" y="94" font-family="${SANS}" font-weight="800" font-size="30" fill="${C.text}">Which region's revenue grew fastest, 2023 to 2024?</text>
+<text x="60" y="${H - 28}" font-family="${SANS}" font-size="14" fill="#6b7f99">Real output on a 72-row sample file. Every number in the table is a stored result of code that ran, and each cell cites a checked claim ([n]). Full report: docs/assets/sample-report.md</text>
+${parts.join('\n')}
+</svg>`;
+}
+
+// ---------------------------------------------------------------- measured results
+// Numbers from docs/eval/verify-2026-11-08.md (238 labelled claims; synthetic passages, written by one author).
+function trust() {
+  const bar = (y, label, value, total, text, color, delay) => {
+    const w = (value / total) * 640;
+    return `<text x="60" y="${y}" font-family="${SANS}" font-size="20" fill="${C.text}">${esc(label)}</text>
+<rect x="60" y="${y + 14}" width="640" height="22" rx="11" fill="#101b33"/>
+<rect x="60" y="${y + 14}" width="${w}" height="22" rx="11" fill="${color}" filter="url(#g)"><animate attributeName="width" values="0;${w};${w}" keyTimes="0;.35;1" dur="6s" begin="${delay}s" repeatCount="indefinite"/></rect>
+<text x="730" y="${y + 33}" font-family="${SANS}" font-weight="800" font-size="26" fill="${color}">${esc(text)}</text>`;
+  };
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 470" width="1280" height="470" role="img" aria-label="Measured results of the claim checker on 238 labelled claims">
+<defs>${glow('g', 3)}${grid('grid')}</defs><rect width="1280" height="470" rx="18" fill="${C.bg}" stroke="${C.line}"/><rect width="1280" height="470" rx="18" fill="url(#grid)" opacity=".45"/>
+<text x="60" y="56" font-family="${SANS}" font-size="15" letter-spacing="6" fill="${C.teal}">MEASURED, NOT PROMISED</text>
+<text x="60" y="98" font-family="${SANS}" font-weight="800" font-size="32" fill="${C.text}">The checker on 238 labelled claims</text>
+${bar(150, 'Fabricated quotes, altered numbers, invented sources rejected by code', 94, 94, '94 / 94', C.teal, 0)}
+${bar(222, 'Contradicted claims removed', 48, 48, '48 / 48', C.teal, .3)}
+${bar(294, 'Stretched claims not confirmed (flagged or removed)', 48, 48, '48 / 48', C.teal, .6)}
+${bar(366, 'Faithful claims confirmed (the other 5 were flagged, none removed)', 43, 48, '43 / 48', C.amber, .9)}
+<g transform="translate(940 140)"><rect width="290" height="250" rx="18" fill="#0b1630" stroke="${C.line}" stroke-width="2"/>
+<text x="145" y="82" text-anchor="middle" font-family="${SANS}" font-weight="800" font-size="76" fill="${C.teal}" filter="url(#g)">0</text>
+<text x="145" y="124" text-anchor="middle" font-family="${SANS}" font-size="18" fill="${C.text}">wrong claims confirmed</text>
+<text x="145" y="150" text-anchor="middle" font-family="${SANS}" font-size="18" fill="${C.muted}">out of 190 wrong claims</text>
+<text x="145" y="198" text-anchor="middle" font-family="${SANS}" font-size="14" fill="#7f97b3">95% interval: 0% to 2.0%</text></g>
+<text x="60" y="436" font-family="${SANS}" font-size="14" fill="#6b7f99">Synthetic passages written by one author; the wrong claims are fairly blatant, so real-world results can be lower. Method and limits: docs/eval/verify-2026-11-08.md</text>
+</svg>`;
+}
+
+// Costs from docs/eval: single measured runs on a Claude Code login, default models.
+function cost() {
+  const rows = [
+    ['Code fix in a small repo', 0.02, 0.03, 'run, separate copy, tests'],
+    ['Data analysis, 72-row CSV', 0.15, 0.22, 'code run in the sandbox + chart'],
+    ['Contract questions, 4-page PDF', 0.19, 0.25, 'every statement cites a page'],
+    ['Narrow research question', 0.19, 0.19, '2 research tasks, 8 claims'],
+    ['Broad research report', 0.77, 1.01, '4 research tasks, about 45 claims'],
+  ];
+  const max = 1.1, W0 = 620;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 440" width="1280" height="440" role="img" aria-label="What measured runs cost">
+<defs>${glow('g', 3)}${grid('grid')}</defs><rect width="1280" height="440" rx="18" fill="${C.bg}" stroke="${C.line}"/><rect width="1280" height="440" rx="18" fill="url(#grid)" opacity=".45"/>
+<text x="60" y="56" font-family="${SANS}" font-size="15" letter-spacing="6" fill="${C.cyan}">WHAT IT COSTS</text>
+<text x="60" y="98" font-family="${SANS}" font-weight="800" font-size="32" fill="${C.text}">Measured runs, in US dollars</text>
+${rows.map(([name, lo, hi, note], i) => { const y = 150 + i * 52; const x1 = 420 + (lo / max) * W0; const x2 = 420 + (hi / max) * W0; return `<text x="60" y="${y + 6}" font-family="${SANS}" font-size="20" fill="${C.text}">${esc(name)}</text>
+<rect x="420" y="${y - 10}" width="${W0}" height="20" rx="10" fill="#101b33"/>
+<rect x="420" y="${y - 10}" width="${Math.max(10, x2 - 420)}" height="20" rx="10" fill="${C.cyan}" opacity=".35"/>
+<rect x="420" y="${y - 10}" width="${Math.max(10, x1 - 420)}" height="20" rx="10" fill="${C.cyan}" filter="url(#g)"><animate attributeName="width" values="0;${Math.max(10, x1 - 420)};${Math.max(10, x1 - 420)}" keyTimes="0;.4;1" dur="6s" begin="${i * 0.2}s" repeatCount="indefinite"/></rect>
+<text x="${Math.max(x2, x1) + 14}" y="${y + 7}" font-family="${SANS}" font-weight="800" font-size="20" fill="${C.cyan}">${lo === hi ? `$${lo.toFixed(2)}` : `$${lo.toFixed(2)}–$${hi.toFixed(2)}`}</text>
+<text x="60" y="${y + 26}" font-family="${SANS}" font-size="13" fill="#6b7f99">${esc(note)}</text>`; }).join('\n')}
+<text x="60" y="418" font-family="${SANS}" font-size="14" fill="#6b7f99">Single runs, not averages; cost varies with how much the agents search and read. You set a budget, see an estimate first, and approve before anything runs.</text>
+</svg>`;
+}
+
+if (process.env.ART_FRAME !== undefined) { writeFileSync(process.env.ART_OUT ?? '/tmp/console-frame.svg', process.env.ART_WHICH === 'code' ? consoleCode() : consoleData()); process.exit(0); }
 out('wordmark.svg', wordmark());
 out('banner.svg', banner());
 out('capabilities.svg', capabilities());
 out('flow.svg', flow());
-out('console.svg', console_());
+out('console.svg', consoleData());
+out('console-code.svg', consoleCode());
+out('chapter-1.svg', chapter(1, 'SEE IT', 'WORK.', 'Real runs, drawn live in your terminal.', ['PLAN', 'WORK', 'CHECK']));
+out('chapter-2.svg', chapter(2, 'ONE GOAL.', 'MANY AGENTS.', 'Research, your files, your data, your code.', ['RESEARCH', 'DOCUMENTS', 'DATA'], C.cyan));
+out('chapter-3.svg', chapter(3, 'FROM ZERO', 'TO VERITAS.', 'Install, check, run.', ['INSTALL', 'CHECK', 'RUN'], C.amber));
+out('chapter-4.svg', chapter(4, 'MEASURED.', 'NOT PROMISED.', 'What the checker caught, what it costs, where it stops.', ['TRUST', 'COST', 'LIMITS'], C.violet));
+out('report.svg', reportCard());
+out('trust.svg', trust());
+out('cost.svg', cost());

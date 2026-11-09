@@ -1,0 +1,111 @@
+{
+ "note": "Recorded from a real Veritas coding run on a tiny sample project (one wrong operator, one failing test). Times are real seconds since the first event.",
+ "task": {
+  "id": "task_123f2e9d316f4752",
+  "goal": "Fix the bug in add() so the tests pass.",
+  "budgetUsd": 1,
+  "spentUsd": 0.0186978
+ },
+ "subtasks": [
+  {
+   "key": "t1",
+   "title": "Make the change",
+   "kind": "code",
+   "model": "sonnet",
+   "cost_usd": 0.0186978,
+   "attempts": 1
+  }
+ ],
+ "testRuns": [
+  {
+   "phase": "baseline",
+   "command": "node --test",
+   "exit_code": 1,
+   "duration_ms": 57
+  },
+  {
+   "phase": "round1",
+   "command": "node --test",
+   "exit_code": 0,
+   "duration_ms": 81
+  }
+ ],
+ "events": [
+  {
+   "t": 0,
+   "type": "task.created",
+   "data": null
+  },
+  {
+   "t": 0.001,
+   "type": "plan.created",
+   "data": {
+    "tasks": 1,
+    "estimateUsd": {
+     "low": 0.08,
+     "high": 0.6
+    },
+    "estimateBasis": "defaults",
+    "costUsd": 0
+   }
+  },
+  {
+   "t": 0.022,
+   "type": "worktree.created",
+   "data": {
+    "branch": "veritas/fix-the-bug-in-add-so-the-test-316f4752"
+   }
+  },
+  {
+   "t": 0.079,
+   "type": "tests.baseline",
+   "data": {
+    "passed": false
+   }
+  },
+  {
+   "t": 0.08,
+   "type": "task.running",
+   "data": null
+  },
+  {
+   "t": 0.08,
+   "type": "subtask.started",
+   "data": {
+    "key": "t1",
+    "title": "Make the change",
+    "model": "sonnet"
+   }
+  },
+  {
+   "t": 6.75,
+   "type": "tests.ran",
+   "data": {
+    "phase": "round1",
+    "passed": true
+   }
+  },
+  {
+   "t": 6.75,
+   "type": "cost.updated",
+   "data": {
+    "spentUsd": 0.0186978,
+    "limitUsd": 1
+   }
+  },
+  {
+   "t": 6.75,
+   "type": "subtask.finished",
+   "data": {
+    "key": "t1",
+    "costUsd": 0.0186978,
+    "attempts": 1
+   }
+  },
+  {
+   "t": 6.795,
+   "type": "task.done",
+   "data": null
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 470" width="1280" height="470" role="img" aria-label="Measured results of the claim checker on 238 labelled claims">
+<defs><filter id="g" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#16253f" stroke-width="1"/></pattern></defs><rect width="1280" height="470" rx="18" fill="#0a1020" stroke="#1d2e4d"/><rect width="1280" height="470" rx="18" fill="url(#grid)" opacity=".45"/>
+<text x="60" y="56" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" letter-spacing="6" fill="#35f2c0">MEASURED, NOT PROMISED</text>
+<text x="60" y="98" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800" font-size="32" fill="#e8eef8">The checker on 238 labelled claims</text>
+<text x="60" y="150" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" fill="#e8eef8">Fabricated quotes, altered numbers, invented sources rejected by code</text>
+<rect x="60" y="164" width="640" height="22" rx="11" fill="#101b33"/>
+<rect x="60" y="164" width="640" height="22" rx="11" fill="#35f2c0" filter="url(#g)"><animate attributeName="width" values="0;640;640" keyTimes="0;.35;1" dur="6s" begin="0s" repeatCount="indefinite"/></rect>
+<text x="730" y="183" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800" font-size="26" fill="#35f2c0">94 / 94</text>
+<text x="60" y="222" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" fill="#e8eef8">Contradicted claims removed</text>
+<rect x="60" y="236" width="640" height="22" rx="11" fill="#101b33"/>
+<rect x="60" y="236" width="640" height="22" rx="11" fill="#35f2c0" filter="url(#g)"><animate attributeName="width" values="0;640;640" keyTimes="0;.35;1" dur="6s" begin="0.3s" repeatCount="indefinite"/></rect>
+<text x="730" y="255" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800" font-size="26" fill="#35f2c0">48 / 48</text>
+<text x="60" y="294" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" fill="#e8eef8">Stretched claims not confirmed (flagged or removed)</text>
+<rect x="60" y="308" width="640" height="22" rx="11" fill="#101b33"/>
+<rect x="60" y="308" width="640" height="22" rx="11" fill="#35f2c0" filter="url(#g)"><animate attributeName="width" values="0;640;640" keyTimes="0;.35;1" dur="6s" begin="0.6s" repeatCount="indefinite"/></rect>
+<text x="730" y="327" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800" font-size="26" fill="#35f2c0">48 / 48</text>
+<text x="60" y="366" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" fill="#e8eef8">Faithful claims confirmed (the other 5 were flagged, none removed)</text>
+<rect x="60" y="380" width="640" height="22" rx="11" fill="#101b33"/>
+<rect x="60" y="380" width="573.3333333333334" height="22" rx="11" fill="#ffc94a" filter="url(#g)"><animate attributeName="width" values="0;573.3333333333334;573.3333333333334" keyTimes="0;.35;1" dur="6s" begin="0.9s" repeatCount="indefinite"/></rect>
+<text x="730" y="399" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800" font-size="26" fill="#ffc94a">43 / 48</text>
+<g transform="translate(940 140)"><rect width="290" height="250" rx="18" fill="#0b1630" stroke="#1d2e4d" stroke-width="2"/>
+<text x="145" y="82" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800" font-size="76" fill="#35f2c0" filter="url(#g)">0</text>
+<text x="145" y="124" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" fill="#e8eef8">wrong claims confirmed</text>
+<text x="145" y="150" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" fill="#8ea3bd">out of 190 wrong claims</text>
+<text x="145" y="198" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#7f97b3">95% interval: 0% to 2.0%</text></g>
+<text x="60" y="436" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#6b7f99">Synthetic passages written by one author; the wrong claims are fairly blatant, so real-world results can be lower. Method and limits: docs/eval/verify-2026-11-08.md</text>
+</svg>
