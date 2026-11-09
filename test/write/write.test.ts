@@ -59,6 +59,29 @@ describe('checkReport', () => {
   });
 });
 
+describe('tables (comparison mode)', () => {
+  const table = '| Contract | Notice |\n|---|---|\n| Alpha | 90 days notice [c1] |\n| Beta | 60 days notice |\n| Gamma | — |';
+  const claims = [claim(1, 'Alpha requires 90 days notice.', { type: 'number', quote: 'terminate on 90 days notice' })];
+  it('checks every cell except the header row and the first column', () => {
+    const r = checkReport(table, claims);
+    expect(r.violations).toHaveLength(1);
+    expect(r.violations[0]).toMatchObject({ line: 3, sentence: '60 days notice' });
+  });
+  it('accepts a cell whose number is in the cited claim and an empty cell marked with a dash', () => {
+    expect(checkReport('| Item | Notice |\n|---|---|\n| Alpha | 90 days notice [c1] |\n| Gamma | — |', claims).violations).toEqual([]);
+  });
+  it('rejects a cell with a number the cited claim does not contain', () => {
+    expect(checkReport('| Item | Notice |\n|---|---|\n| Alpha | 120 days notice [c1] |', claims).violations[0]!.reason).toMatch(/120/);
+  });
+  it('blanks a bad cell instead of deleting the row', () => {
+    const v = checkReport(table, claims).violations;
+    expect(removeViolations(table, v)).toBe('| Contract | Notice |\n|---|---|\n| Alpha | 90 days notice [c1] |\n| Beta | — |\n| Gamma | — |');
+  });
+  it('ignores page and clause references in a sentence', () => {
+    expect(checkReport('Fees are 4,500 dollars per month, on page 2 and in clause 7 [c3].', [claim(3, 'Fees are 4,500 dollars per month.')]).violations).toEqual([]);
+  });
+});
+
 describe('removeViolations', () => {
   it('removes only the offending sentences', () => {
     const md = 'Good fact [c1]. Bad invented fact 99.\n- Bad list item 12.\nKeep this one [c2].';

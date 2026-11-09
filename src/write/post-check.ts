@@ -1,5 +1,5 @@
 import type { ClaimRow } from '../evidence/evidence-store.js';
-import { extractNumbers } from '../verify/numbers.js';
+import { extractNumbers, stripLocators } from '../verify/numbers.js';
 
 export const CITATION_RE = /\[c(\d+)\]/g;
 
@@ -11,6 +11,15 @@ export interface Violation {
 }
 
 const stripCitations = (s: string): string => s.replace(CITATION_RE, '').replace(/\s+/g, ' ').trim();
+
+const isTableRow = (line: string): boolean => /^\s*\|.*\|\s*$/.test(line);
+const isTableRule = (line: string): boolean => /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(line) && line.includes('-');
+
+/** Cells of a table row that must be checked: not the header row and not the first column, which hold labels. */
+function tableCells(line: string): string[] {
+  const cells = line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+  return cells.slice(1).filter((c) => c && c !== '—' && c !== '-');
+}
 
 /** Split one line of Markdown into sentences. Headings, rules and table separators have none to check. */
 export function sentencesOf(line: string): string[] {
@@ -39,8 +48,13 @@ export function checkReport(markdown: string, claims: readonly ClaimRow[]): { vi
   const usable = new Map(claims.filter((c) => c.status === 'confirmed' || c.status === 'flagged').map((c) => [c.seq, c]));
   const violations: Violation[] = [];
   let analysisSentences = 0;
-  markdown.split('\n').forEach((line, i) => {
-    for (const sentence of sentencesOf(line)) {
+  const lines = markdown.split('\n');
+  // The first row of a table is its header.
+  const headerRows = new Set<number>();
+  lines.forEach((l, i) => { if (isTableRow(l) && !isTableRow(lines[i - 1] ?? '') && isTableRule(lines[i + 1] ?? '')) headerRows.add(i); });
+  lines.forEach((line, i) => {
+    const parts = isTableRule(line) ? [] : isTableRow(line) ? (headerRows.has(i) ? [] : tableCells(line)) : sentencesOf(line);
+    for (const sentence of parts) {
       const ids = [...sentence.matchAll(CITATION_RE)].map((m) => Number(m[1]));
       if (isAnalysis(sentence)) { analysisSentences++; }
       const bad = ids.filter((id) => !usable.has(id));
@@ -52,19 +66,22 @@ export function checkReport(markdown: string, claims: readonly ClaimRow[]): { vi
       }
       const evidenceText = ids.map((id) => `${usable.get(id)!.text} ${usable.get(id)!.quote ?? ''}`).join(' ');
       const have = extractNumbers(evidenceText);
-      const missing = extractNumbers(stripCitations(sentence)).filter((n) => !have.some((h) => h.value === n.value));
+      const missing = extractNumbers(stripLocators(stripCitations(sentence))).filter((n) => !have.some((h) => h.value === n.value));
       if (missing.length) violations.push({ line: i, sentence, reason: `contains ${missing.map((m) => m.raw).join(', ')}, which the cited claims do not contain` });
     }
   });
   return { violations, analysisSentences };
 }
 
-/** Remove the offending sentences. A line left empty is dropped; a heading is never touched. */
+/** Remove the offending sentences. A line left empty is dropped; a heading is never touched; a table cell becomes "—". */
 export function removeViolations(markdown: string, violations: readonly Violation[]): string {
   const lines = markdown.split('\n');
   for (const v of violations) {
     const idx = lines.findIndex((l, i) => i === v.line && l.includes(v.sentence));
-    if (idx >= 0) lines[idx] = lines[idx]!.replace(v.sentence, '').replace(/\s{2,}/g, ' ').trimEnd();
+    if (idx < 0) continue;
+    lines[idx] = isTableRow(lines[idx]!)
+      ? lines[idx]!.replace(v.sentence, '—')
+      : lines[idx]!.replace(v.sentence, '').replace(/\s{2,}/g, ' ').trimEnd();
   }
   return lines.filter((l, i) => !(l.trim() === '' && violations.some((v) => v.line === i)) && !/^\s*(?:[-*+]|\d+[.)])\s*$/.test(l)).join('\n');
 }

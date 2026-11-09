@@ -64,6 +64,21 @@ describe('parseReport', () => {
   });
 });
 
+describe('tables', () => {
+  const md = '## Comparison\n\n| Contract | Notice |\n|---|---|\n| Alpha | 90 days [1] |\n| Beta | — |\n\nAfter the table.';
+  it('parses rows without the rule line', () => {
+    const t = parseReport(md).find((b) => b.type === 'table');
+    expect(t).toEqual({ type: 'table', rows: [['Contract', 'Notice'], ['Alpha', '90 days [1]'], ['Beta', '—']] });
+    expect(parseReport(md).at(-1)).toMatchObject({ type: 'paragraph' });
+  });
+  it('exports to Word and PDF', async () => {
+    const xml = unzip(await exportReport(md, 'docx'), 'word/document.xml');
+    expect(xml).toContain('<w:tbl>');
+    expect(xml).toContain('90 days [1]');
+    expect((await exportReport(md, 'pdf')).subarray(0, 5).toString()).toBe('%PDF-');
+  });
+});
+
 describe('exportReport', () => {
   it('returns Markdown unchanged', async () => {
     expect((await exportReport(REPORT, 'md')).toString()).toBe(REPORT);

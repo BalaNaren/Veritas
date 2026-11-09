@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
-import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';
+import { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
 import pdfmake from 'pdfmake';
 
 export type ExportFormat = 'md' | 'docx' | 'pdf';
@@ -13,7 +13,8 @@ export type Block =
   | { type: 'bullet'; runs: Run[] }
   | { type: 'numbered'; n: number; runs: Run[] }
   | { type: 'quote'; runs: Run[] }
-  | { type: 'note'; runs: Run[] };
+  | { type: 'note'; runs: Run[] }
+  | { type: 'table'; rows: string[][] };
 
 /** Split `**bold**` markers into runs. */
 export function inlineRuns(text: string): Run[] {
@@ -38,6 +39,14 @@ export function parseReport(markdown: string): Block[] {
     const numbered = line.match(/^(\d+)\.\s+(.*)$/);
     const quote = line.match(/^\s*>\s?(.*)$/);
     if (!line.trim()) { flush(); continue; }
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      flush();
+      if (/^[\s|:-]+$/.test(line) && line.includes('-')) continue; // the rule under the header
+      const cells = line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      const last = blocks[blocks.length - 1];
+      if (last?.type === 'table') last.rows.push(cells); else blocks.push({ type: 'table', rows: [cells] });
+      continue;
+    }
     if (h) { flush(); blocks.push({ type: 'heading', level: Math.min(3, h[1]!.length) as 1 | 2 | 3, text: h[2]!.replace(/\*\*/g, '') }); continue; }
     if (bullet) { flush(); blocks.push({ type: 'bullet', runs: inlineRuns(bullet[1]!) }); continue; }
     if (numbered) { flush(); blocks.push({ type: 'numbered', n: Number(numbered[1]), runs: inlineRuns(numbered[2]!) }); continue; }
@@ -62,6 +71,10 @@ export async function toDocx(markdown: string): Promise<Buffer> {
       case 'numbered': return new Paragraph({ indent: { left: 360, hanging: 360 }, children: [new TextRun(`${b.n}. `), ...docxRuns(b.runs)] });
       case 'quote': return new Paragraph({ indent: { left: 720 }, children: docxRuns(b.runs, true) });
       case 'note': return new Paragraph({ indent: { left: 720 }, children: docxRuns(b.runs) });
+      case 'table': return new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: b.rows.map((row, r) => new TableRow({ tableHeader: r === 0, children: row.map((c) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: c, bold: r === 0 })] })] })) })),
+      });
       default: return new Paragraph({ spacing: { after: 120 }, children: docxRuns(b.runs) });
     }
   });
@@ -98,6 +111,10 @@ export async function toPdf(markdown: string): Promise<Buffer> {
       case 'numbered': return { columns: [{ width: 22, text: `${b.n}.` }, { width: '*', text: pdfRuns(b.runs) }], margin: [0, 4, 0, 0] };
       case 'quote': return { text: pdfRuns(b.runs, { italics: true, color: '#444444' }), margin: [22, 0, 0, 2] };
       case 'note': return { text: pdfRuns(b.runs, { color: '#8a4b00' }), margin: [22, 0, 0, 2] };
+      case 'table': return {
+        table: { headerRows: 1, widths: b.rows[0]!.map(() => '*'), body: b.rows.map((row, r) => row.map((c) => ({ text: pdfText(c), bold: r === 0 }))) },
+        layout: 'lightHorizontalLines', margin: [0, 4, 0, 8],
+      };
       default: return { text: pdfRuns(b.runs), margin: [0, 0, 0, 6] };
     }
   });

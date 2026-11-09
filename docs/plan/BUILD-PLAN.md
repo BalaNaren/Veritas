@@ -234,9 +234,9 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 **Goal:** analyze user files with exact-passage/page citations and numbers from code that actually ran.
 
 ### M3 tasks
-- [ ] **Readers** (`src/documents/`): PDF (`pdfjs-dist`, per-page text), DOCX (`mammoth`), TXT/MD, CSV (in-house parser), XLSX (pinned `exceljs`), JSON. Each yields `{pages|sections:[{n, text}]}` stored as sources (`kind: file`, location = page/section).
-- [ ] **Document agents**: `claude -p` with `--add-dir <input dir>` and `--allowed-tools Read Grep Glob` only; findings schema includes `{file, page, quote}`. Verifier steps 1–2 check against Veritas's own extracted page text.
-- [ ] **Large jobs**: split files across parallel agents; merge findings; comparison mode (document × attribute table, every cell a claim).
+- [x] **Readers** (`src/documents/`): PDF (`pdfjs-dist`, per-page text), DOCX (`mammoth`), TXT/MD, CSV (in-house parser), XLSX (pinned `exceljs`), JSON. Each yields `{pages|sections:[{n, text}]}` stored as sources (`kind: file`, location = page/section).
+- [x] **Document agents**: `claude -p` with `--add-dir <input dir>` and `--allowed-tools Read Grep Glob` only; findings schema includes `{file, page, quote}`. Verifier steps 1–2 check against Veritas's own extracted page text.
+- [x] **Large jobs**: the planner splits files and questions across parallel `document` agents (up to the plan's task limit); findings merge into one claim list; comparison mode is a Markdown table whose non-label cells must each cite a claim (checked in code; an uncited cell becomes "—"); tables export to Word and PDF.
 - [ ] **Sandbox** (`src/sandbox/`, D4): backends `docker` (pinned image digest, `--network none`, read-only input mount, tmpfs output, cpu/mem/time limits) and `sandbox-exec` (generated profile: deny network, deny file-write outside temp dir, read-only input copy); a Python runtime with pinned `pandas`, `matplotlib` in a Veritas-managed venv (created only with user approval in `veritas setup`).
 - [ ] **Data agents**: agent writes analysis code (returned via schema, no execution tools); **Veritas runs it in the sandbox**, captures stdout/files; computed-number claims reference `{runId, outputKey}`; numbers checked against stored output (verifier step 4).
 - [ ] **Charts** saved as PNG next to the report; code included in the task record.
