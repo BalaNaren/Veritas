@@ -43,7 +43,10 @@ Both recordings are the real terminal view, drawn from the events of real runs. 
 <a id="what-it-does"></a>
 <p align="center"><img src="docs/assets/chapter-2.svg" alt="Chapter 2: one goal, many agents" width="100%"></p>
 
-<p align="center"><img src="docs/assets/capabilities.svg" alt="Verified claims, parallel agents, your files and data, safe by default" width="100%"></p>
+<table>
+<tr><td width="50%"><img src="docs/assets/card-trust.svg" width="100%" alt="Verified claims: every fact is tied to a source and quote; what fails the check is removed."></td><td width="50%"><img src="docs/assets/card-speed.svg" width="100%" alt="Parallel agents: a planner splits the goal across agents; you approve the plan and cost first."></td></tr>
+<tr><td width="50%"><img src="docs/assets/card-files.svg" width="100%" alt="Your files and data: PDF, Word, Excel, CSV cited to the page; numbers only from code that really ran."></td><td width="50%"><img src="docs/assets/card-control.svg" width="100%" alt="Safe by default: code changes happen in a separate copy; commit, merge and push ask you first."></td></tr>
+</table>
 
 <p align="center"><img src="docs/assets/flow.svg" alt="How a task flows: goal, plan, agents, check, result. Removed claims are listed with the reason; flagged claims are shown with a warning." width="100%"></p>
 

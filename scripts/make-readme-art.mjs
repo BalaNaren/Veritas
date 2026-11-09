@@ -92,31 +92,35 @@ function banner() {
 </svg>`;
 }
 
-// ---------------------------------------------------------------- capability cards
-function card(x, y, title, lines, icon, accent, label, index = 0) {
-  return `<g transform="translate(${x} ${y})">
-<rect width="604" height="250" rx="24" fill="#0c1426" stroke="${C.line}" stroke-width="2"/>
-<rect x="6" y="6" width="592" height="238" rx="19" fill="none" stroke="${accent}" stroke-width="3" opacity=".9" filter="url(#g)"/>
-<rect x="6" y="6" width="592" height="238" rx="19" fill="none" stroke="#ffffff" stroke-opacity=".25" stroke-width="1"/>
-<g transform="translate(96 100)"><circle r="62" fill="#101d36"/>${icon}</g>
-<text x="190" y="72" font-family="${SANS}" font-size="15" letter-spacing="5" fill="${accent}">${label}</text>
-<text x="190" y="116" font-family="${SANS}" font-weight="700" font-size="36" fill="${C.text}">${title}</text>
-${lines.map((l, i) => `<text x="40" y="${186 + i * 30}" font-family="${SANS}" font-size="21" fill="#b4c3da">${l}</text>`).join('\n')}
-</g>`;
-}
-function capabilities() {
-  const stroke = (c) => `fill="none" stroke="${c}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" filter="url(#g)"`;
-  const verified = `<path d="M0 -38 L34 -24 V8 C34 28 16 40 0 47 C-16 40 -34 28 -34 8 V-24 Z" ${stroke(C.teal)}/><path d="M-15 4 L-3 17 L19 -10" ${stroke('#e9fff9')}/>`;
-  const parallel = `<g ${stroke(C.cyan)}><circle cx="-32" cy="0" r="9"/><circle cx="30" cy="-26" r="9"/><circle cx="30" cy="0" r="9"/><circle cx="30" cy="26" r="9"/><path d="M-23 0 L21 -24 M-23 0 L21 0 M-23 0 L21 24"/></g>`;
-  const files = `<g ${stroke(C.amber)}><path d="M-26 -34 H8 L22 -20 V34 H-26 Z"/><path d="M8 -34 V-20 H22"/><path d="M-16 -6 H12 M-16 8 H12 M-16 21 H2"/></g>`;
-  const safe = `<g ${stroke(C.violet)}><rect x="-26" y="-6" width="52" height="40" rx="8"/><path d="M-14 -6 V-18 A14 14 0 0 1 14 -18 V-6"/><circle cx="0" cy="14" r="4"/></g>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 540" width="1280" height="540" role="img" aria-label="What Veritas does">
-<defs>${glow('g', 3)}${grid('grid')}</defs><rect width="1280" height="540" rx="18" fill="${C.bg}"/><rect width="1280" height="540" rx="18" fill="url(#grid)" opacity=".45"/>
-${card(24, 10, 'Verified claims', ['Every fact is tied to a source and an exact quote.', 'An independent checker reads it. What fails is removed.'], verified, C.teal, 'VERITAS / TRUST', 0)}
-${card(652, 10, 'Parallel agents', ['A planner splits the goal. Agents work at the same time.', 'You approve the plan and the cost first.'], parallel, C.cyan, 'VERITAS / SPEED', 1)}
-${card(24, 280, 'Your files and data', ['PDF, Word, Excel, CSV: cited to the exact page.', 'Numbers come only from code that really ran.'], files, C.amber, 'VERITAS / YOUR WORK', 2)}
-${card(652, 280, 'Safe by default', ['Code changes happen in a separate copy of your repo.', 'Commit, merge and push always ask you first.'], safe, C.violet, 'VERITAS / CONTROL', 3)}
+// ---------------------------------------------------------------- capability cards, one image each
+// Small and shown near their real size (two to a row), so the text stays sharp. Glow only on the neon border and icon.
+function smallCard(title, lines, icon, accent, label) {
+  const W = 448, H = 232;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(title)}">
+<defs><filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#101a30"/><stop offset="1" stop-color="#0a1122"/></linearGradient>
+<pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity=".035"/></pattern></defs>
+<rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="20" fill="url(#bg)" stroke="#1f2f4d" stroke-width="2"/>
+<rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="20" fill="url(#grid)"/>
+<rect x="10" y="10" width="${W - 20}" height="${H - 20}" rx="14" fill="none" stroke="${accent}" stroke-width="2.5" filter="url(#glow)"/>
+<rect x="10" y="10" width="${W - 20}" height="${H - 20}" rx="14" fill="none" stroke="#ffffff" stroke-opacity=".35" stroke-width="1"/>
+<g transform="translate(70 70)"><circle r="40" fill="#13213d"/><circle r="40" fill="none" stroke="${accent}" stroke-opacity=".25" stroke-width="1.5"/><g transform="scale(.62)" filter="url(#glow)">${icon}</g></g>
+<text x="126" y="52" font-family="${SANS}" font-size="11" letter-spacing="2.5" fill="${accent}">${esc(label)}</text>
+<text x="126" y="86" font-family="${SANS}" font-weight="700" font-size="28" fill="#f2f6fc">${esc(title)}</text>
+${lines.map((l, i) => `<text x="28" y="${150 + i * 28}" font-family="${SANS}" font-size="17" fill="#c3d1e4">${esc(l)}</text>`).join('\n')}
+<rect x="28" y="196" width="${W - 56}" height="2" rx="1" fill="${accent}" fill-opacity=".18"/>
+<rect x="28" y="196" width="64" height="2" rx="1" fill="${accent}"/>
 </svg>`;
+}
+
+function iconSet() {
+  const stroke = (c) => `fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"`;
+  return {
+    verified: `<path d="M0 -38 L34 -24 V8 C34 28 16 40 0 47 C-16 40 -34 28 -34 8 V-24 Z" ${stroke(C.teal)}/><path d="M-15 4 L-3 17 L19 -10" ${stroke('#eafff9')}/>`,
+    parallel: `<g ${stroke(C.cyan)}><circle cx="-32" cy="0" r="9"/><circle cx="30" cy="-26" r="9"/><circle cx="30" cy="0" r="9"/><circle cx="30" cy="26" r="9"/><path d="M-23 0 L21 -24 M-23 0 L21 0 M-23 0 L21 24"/></g>`,
+    files: `<g ${stroke(C.amber)}><path d="M-26 -34 H8 L22 -20 V34 H-26 Z"/><path d="M8 -34 V-20 H22"/><path d="M-16 -6 H12 M-16 8 H12 M-16 21 H2"/></g>`,
+    safe: `<g ${stroke(C.violet)}><rect x="-26" y="-6" width="52" height="40" rx="8"/><path d="M-14 -6 V-18 A14 14 0 0 1 14 -18 V-6"/><circle cx="0" cy="14" r="4"/></g>`,
+  };
 }
 
 // ---------------------------------------------------------------- flow diagram
@@ -368,7 +372,13 @@ ${rows.map(([name, lo, hi, note], i) => { const y = 150 + i * 52; const x1 = 420
 if (process.env.ART_FRAME !== undefined) { writeFileSync(process.env.ART_OUT ?? '/tmp/console-frame.svg', process.env.ART_WHICH === 'code' ? consoleCode() : consoleData()); process.exit(0); }
 out('wordmark.svg', wordmark());
 out('banner.svg', banner());
-out('capabilities.svg', capabilities());
+{
+  const ic = iconSet();
+  out('card-trust.svg', smallCard('Verified claims', ['Every fact is tied to a source and quote.', 'What fails the check is removed.'], ic.verified, C.teal, 'VERITAS / TRUST'));
+  out('card-speed.svg', smallCard('Parallel agents', ['A planner splits the goal across agents.', 'You approve the plan and cost first.'], ic.parallel, C.cyan, 'VERITAS / SPEED'));
+  out('card-files.svg', smallCard('Your files and data', ['PDF, Word, Excel, CSV: cited to the page.', 'Numbers only from code that really ran.'], ic.files, C.amber, 'VERITAS / YOUR WORK'));
+  out('card-control.svg', smallCard('Safe by default', ['Code changes happen in a separate copy.', 'Commit, merge and push ask you first.'], ic.safe, C.violet, 'VERITAS / CONTROL'));
+}
 out('flow.svg', flow());
 out('console.svg', consoleData());
 out('console-code.svg', consoleCode());

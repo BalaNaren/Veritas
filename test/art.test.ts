@@ -29,10 +29,13 @@ describe('README graphics', () => {
     expect(missing, name).toEqual([]);
   });
 
-  it('has no moving line on the capability cards', () => {
-    const cap = readFileSync(join(dir, 'capabilities.svg'), 'utf8');
-    expect(cap).not.toMatch(/<animate/);
-    expect(cap).not.toContain('pathLength');
-    expect(cap.match(/translate\(\d+ \d+\)">\n<rect width="604"/g)?.length).toBe(4);   // the four cards are still there
+  it('shows the capability cards as small separate images, near their real size, with nothing moving', () => {
+    for (const name of ['card-trust', 'card-speed', 'card-files', 'card-control']) {
+      const svg = readFileSync(join(dir, `${name}.svg`), 'utf8');
+      expect(svg, name).toContain('viewBox="0 0 448 232"');
+      expect(svg, name).not.toMatch(/<animate/);
+      // Text is never blurred: the glow filter is used only on the border and the icon.
+      for (const m of svg.matchAll(/<text[^>]*>/g)) expect(m[0], name).not.toContain('filter=');
+    }
   });
 });
