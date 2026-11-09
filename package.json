@@ -25,7 +25,8 @@
     "test": "npm run clean-check && vitest run",
     "test:watch": "vitest",
     "eval:verify": "npm run build && node scripts/eval-verify.mjs",
-    "probe:permissions": "npm run build && node scripts/probe-permissions.mjs"
+    "probe:permissions": "npm run build && node scripts/probe-permissions.mjs",
+    "art": "npm run build && node scripts/make-readme-art.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

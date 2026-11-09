@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 300" width="1280" height="300" role="img" aria-label="Veritas">
+<defs><filter id="g1" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="g2" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#16253f" stroke-width="1"/></pattern>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0c1428"/><stop offset="1" stop-color="#070b16"/></linearGradient></defs>
+<rect width="1280" height="300" rx="22" fill="url(#bg)"/><rect width="1280" height="300" rx="22" fill="url(#grid)" opacity=".6"/>
+<g filter="url(#g1)"><rect x="70" y="40" width="1140" height="220" rx="46" fill="none" stroke="#35f2c0" stroke-width="5">
+<animate attributeName="opacity" values="1;1;.35;1;.55;1;1;1" keyTimes="0;.62;.64;.66;.68;.7;.9;1" dur="7s" repeatCount="indefinite"/></rect></g>
+<rect x="70" y="40" width="1140" height="220" rx="46" fill="none" stroke="#c9fff0" stroke-width="1.6" opacity=".9"/>
+<g filter="url(#g2)"><text x="640" y="190" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800" font-size="132" letter-spacing="18" fill="none" stroke="#ffc94a" stroke-width="5">VERITAS
+<animate attributeName="opacity" values="1;1;.5;1;.8;1;1" keyTimes="0;.3;.31;.33;.35;.37;1" dur="9s" repeatCount="indefinite"/></text></g>
+<text x="640" y="190" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800" font-size="132" letter-spacing="18" fill="none" stroke="#fff6dc" stroke-width="1.6">VERITAS</text>
+<g stroke="#35f2c0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#g2)"><path d="M520 232 L560 246 L720 226" stroke-dasharray="260" stroke-dashoffset="260"><animate attributeName="stroke-dashoffset" values="260;0;0;260" keyTimes="0;.25;.85;1" dur="6s" repeatCount="indefinite"/><animate attributeName="stroke-opacity" values="0;1;1;0" keyTimes="0;.02;.85;1" dur="6s" repeatCount="indefinite"/></path></g>
+</svg>

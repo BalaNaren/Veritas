@@ -1,0 +1,201 @@
+{
+ "note": "Recorded from a real Veritas run on a small sample CSV (72 rows). Times are real seconds since the first event.",
+ "task": {
+  "id": "task_0a2e5f7a09c04b55",
+  "goal": "Which region's revenue grew fastest between 2023 and 2024, and what was total revenue in each year? Include a chart.",
+  "budgetUsd": 1.5,
+  "spentUsd": 0.15426022499999997
+ },
+ "subtasks": [
+  {
+   "key": "t1",
+   "title": "Regional revenue growth 2023→2024 and yearly totals, with chart",
+   "kind": "data",
+   "model": "sonnet",
+   "cost_usd": 0.052987400000000004,
+   "attempts": 1
+  }
+ ],
+ "claimsByStatus": [
+  {
+   "status": "confirmed",
+   "n": 8
+  }
+ ],
+ "events": [
+  {
+   "t": 0,
+   "type": "task.created",
+   "data": {
+    "goal": "Which region's revenue grew fastest between 2023 and 2024, and what was total revenue in each year? Include a chart.",
+    "budgetUsd": 1.5
+   }
+  },
+  {
+   "t": 0.003,
+   "type": "file.read",
+   "data": {
+    "name": "sales.csv",
+    "kind": "csv",
+    "parts": 1,
+    "sourceId": "src_08fc7afe2e6b4d86"
+   }
+  },
+  {
+   "t": 0.003,
+   "type": "plan.started",
+   "data": null
+  },
+  {
+   "t": 7.122,
+   "type": "plan.created",
+   "data": {
+    "tasks": 1,
+    "estimateUsd": {
+     "low": 0.08,
+     "high": 0.3
+    },
+    "estimateBasis": "defaults",
+    "costUsd": 0.027695199999999996
+   }
+  },
+  {
+   "t": 7.122,
+   "type": "task.running",
+   "data": null
+  },
+  {
+   "t": 7.123,
+   "type": "subtask.started",
+   "data": {
+    "key": "t1",
+    "title": "Regional revenue growth 2023→2024 and yearly totals, with chart",
+    "model": "sonnet"
+   }
+  },
+  {
+   "t": 26.2,
+   "type": "cost.updated",
+   "data": {
+    "spentUsd": 0.0806826,
+    "limitUsd": 1.5
+   }
+  },
+  {
+   "t": 26.2,
+   "type": "subtask.finished",
+   "data": {
+    "key": "t1",
+    "costUsd": 0.052987400000000004,
+    "attempts": 1
+   }
+  },
+  {
+   "t": 26.201,
+   "type": "verify.started",
+   "data": null
+  },
+  {
+   "t": 26.202,
+   "type": "evidence.ingested",
+   "data": {
+    "key": "t1",
+    "claims": 8,
+    "duplicates": 0,
+    "sourcesFetched": 0,
+    "sourcesFailed": 0,
+    "runId": "run_030c253f7a4e405b"
+   }
+  },
+  {
+   "t": 29.729,
+   "type": "claim.verified",
+   "data": {
+    "seq": 2,
+    "status": "confirmed",
+    "reason": null
+   }
+  },
+  {
+   "t": 30.977,
+   "type": "claim.verified",
+   "data": {
+    "seq": 3,
+    "status": "confirmed",
+    "reason": null
+   }
+  },
+  {
+   "t": 31.178,
+   "type": "claim.verified",
+   "data": {
+    "seq": 4,
+    "status": "confirmed",
+    "reason": null
+   }
+  },
+  {
+   "t": 31.798,
+   "type": "claim.verified",
+   "data": {
+    "seq": 1,
+    "status": "confirmed",
+    "reason": null
+   }
+  },
+  {
+   "t": 34.245,
+   "type": "claim.verified",
+   "data": {
+    "seq": 5,
+    "status": "confirmed",
+    "reason": null
+   }
+  },
+  {
+   "t": 35.439,
+   "type": "claim.verified",
+   "data": {
+    "seq": 8,
+    "status": "confirmed",
+    "reason": null
+   }
+  },
+  {
+   "t": 35.959,
+   "type": "claim.verified",
+   "data": {
+    "seq": 6,
+    "status": "confirmed",
+    "reason": null
+   }
+  },
+  {
+   "t": 35.96,
+   "type": "claim.verified",
+   "data": {
+    "seq": 7,
+    "status": "confirmed",
+    "reason": null
+   }
+  },
+  {
+   "t": 35.961,
+   "type": "verify.done",
+   "data": {
+    "confirmed": 8,
+    "flagged": 0,
+    "removed": 0,
+    "notChecked": 0
+   }
+  },
+  {
+   "t": 51.708,
+   "type": "task.done",
+   "data": {
+    "resultPath": "/tmp/veritas-m3-home/tasks/task_0a2e5f7a09c04b55/result.md",
+    "spentUsd": 0.15426022499999997
+   }
+  }
+ ]
+}

@@ -93,7 +93,7 @@ export function buildFrame(s: LiveSnapshot, fmt: OutputFormatter, o: FrameOption
   const left = ` VERITAS   ${clip(s.taskId, 28)}`;
   const gap = Math.max(1, w - left.length - `elapsed ${clock(o.elapsedMs)}`.length - 1);
   lines.push(`${brand}  ${id}${' '.repeat(gap)}${time}`);
-  lines.push(fmt.bold(clip(s.goal, w - 2)));
+  lines.push(` ${fmt.bold(clip(s.goal, w - 3))}`);
   lines.push('');
 
   // Phase pipeline
