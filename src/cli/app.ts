@@ -25,6 +25,8 @@ export interface Runtime {
   ask(question: string): Promise<string>;
   makeProvider(config: VeritasConfig): ModelProvider;
   probeClaude(config: VeritasConfig): Promise<ClaudeProbe>;
+  /** Install the analysis runtime. Replaced in tests. */
+  setupRuntime?(home: string, onStep: (message: string) => void): Promise<void>;
   /** Be told when the user presses Ctrl-C. Returns a function that stops listening. */
   onInterrupt(handler: () => void): () => void;
   /** Delay before retrying a failed agent; tests set 0. */

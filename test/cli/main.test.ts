@@ -15,6 +15,7 @@ const FAKE = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'fa
 const homes: string[] = [];
 afterEach(() => { while (homes.length) rmSync(homes.pop()!, { recursive: true, force: true }); });
 
+let setupCalls = 0;
 function harness(opts: { interactive?: boolean; answers?: string[]; probe?: ClaudeProbe; home?: string } = {}) {
   const home = opts.home ?? mkdtempSync(join(tmpdir(), 'veritas-cli-'));
   if (!opts.home) homes.push(home);
@@ -29,6 +30,7 @@ function harness(opts: { interactive?: boolean; answers?: string[]; probe?: Clau
     async ask(q) { asked.push(q); return answers.shift() ?? ''; },
     makeProvider: () => new ClaudeCodeProvider({ binary: FAKE, defaultTimeoutMs: 15_000 }),
     probeClaude: async () => opts.probe ?? { found: true, path: '/x/claude', version: '9', loggedIn: true, detail: 'logged in (test)' },
+    setupRuntime: async () => { setupCalls++; },
     onInterrupt: () => () => {},
     retryDelayMs: 0,
   };
@@ -215,5 +217,27 @@ describe('veritas CLI', () => {
     expect(h.err()).toMatch(/no supported files/);
     expect(await h.run('list')).toBe(0);
     expect(h.out()).toContain('No tasks yet');
+  });
+
+  it('asks before setting up the sandbox, and installs nothing when declined', async () => {
+    setupCalls = 0;
+    const no = harness({ interactive: true, answers: ['n'] });
+    expect(await no.run('setup')).toBe(0);
+    expect(no.out()).toContain('no network access');
+    expect(no.out()).toContain('Nothing was installed');
+    expect(setupCalls).toBe(0);
+    const unattended = harness();
+    expect(await unattended.run('setup')).toBe(1);
+    expect(unattended.err()).toMatch(/terminal, or pass --yes/);
+    expect(setupCalls).toBe(0);
+    const yes = harness();
+    await yes.run('setup', '--yes');
+    expect(setupCalls).toBe(1);
+  });
+
+  it('mentions the sandbox in doctor without treating a missing one as a failure', async () => {
+    const h = harness();
+    expect(await h.run('doctor')).toBe(0);
+    expect(h.out()).toContain('Analysis sandbox');
   });
 });

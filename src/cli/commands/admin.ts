@@ -1,6 +1,9 @@
 import { existsSync, statSync } from 'node:fs';
 import { loadConfig, flattenConfig, setConfigValue, configPath, SETTABLE_KEYS } from '../../config.js';
-import { dbPath } from '../../storage/paths.js';
+import { dbPath, ensureHome } from '../../storage/paths.js';
+import { chooseSandbox } from '../../sandbox/index.js';
+import { PINNED_PACKAGES, venvDir } from '../../sandbox/python.js';
+import { SandboxExecSandbox } from '../../sandbox/sandbox-exec.js';
 import { Store } from '../../storage/store.js';
 import { PRODUCT_NAME, VERSION } from '../../version.js';
 import type { App } from '../app.js';
@@ -33,6 +36,9 @@ export async function runDoctor(app: App): Promise<Check[]> {
     checks.push({ name: 'Claude Code', ok: probe.found, detail: probe.found ? `${probe.path ?? 'found'}${probe.version ? ` (${probe.version})` : ''}` : probe.detail });
     if (probe.found) checks.push({ name: 'Claude login', ok: probe.loggedIn === true, detail: probe.loggedIn ? probe.detail : `${probe.detail} Run \`claude\` once and log in.` });
   }
+
+  const sandbox = await chooseSandbox(app.home);
+  checks.push({ name: 'Analysis sandbox', ok: true, detail: sandbox.sandbox ? `ready (${sandbox.sandbox.backend})` : `not set up; only needed for data analysis. ${sandbox.problem}` });
 
   if (existsSync(app.home)) {
     const mode = statSync(app.home).mode & 0o777;
@@ -76,6 +82,31 @@ export function adminCommands(app: App): Command[] {
           return ok;
         }
         throw new ValidationError(`Unknown config command "${sub}". Use list, get, set or path.`);
+      },
+    },
+    {
+      name: 'setup',
+      description: 'Set up the sandbox that data analysis runs in (asks before installing anything)',
+      options: [{ name: 'yes', type: 'boolean', description: 'Do not ask for confirmation' }],
+      action: async (ctx) => {
+        const current = await chooseSandbox(app.home);
+        if (current.sandbox) { out.writeln(`Already set up: analysis runs in the ${current.sandbox.backend} sandbox.`); return ok; }
+        const what = SandboxExecSandbox.available()
+          ? `download and install ${PINNED_PACKAGES.join(', ')} from the Python package index into a private folder (${venvDir(app.home)}). Nothing outside that folder is changed.`
+          : 'build a Docker image (veritas-python:1) from the Dockerfile that ships with Veritas, downloading a pinned Python base image and the same pinned libraries.';
+        out.writeln(`Data analysis runs code the AI writes, only inside a sandbox with no network access. To prepare it Veritas will ${what}`);
+        if (ctx.flags.yes !== true) {
+          if (!app.rt.interactive) throw new ValidationError('Run this in a terminal, or pass --yes to confirm.');
+          const a = (await app.rt.ask('Go ahead? [y/N] ')).trim().toLowerCase();
+          if (a !== 'y' && a !== 'yes') { out.writeln('Nothing was installed.'); return ok; }
+        }
+        ensureHome(app.home);
+        if (!app.rt.setupRuntime) throw new ValidationError('Setup is not available here.');
+        await app.rt.setupRuntime(app.home, (m) => out.writeln(out.dim(m)));
+        const after = await chooseSandbox(app.home);
+        if (!after.sandbox) throw new ValidationError(after.problem ?? 'Setup finished but the sandbox is still unavailable.');
+        out.writeln(out.success(`Ready: analysis runs in the ${after.sandbox.backend} sandbox.`));
+        return ok;
       },
     },
     {

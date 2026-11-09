@@ -4,6 +4,9 @@ import { resolveClaudeLaunchCommand } from '../agents/claude-command.js';
 import { pickEnv } from '../shared/env.js';
 import { runProcess } from '../shared/process.js';
 import { tryJsonParse } from '../shared/json.js';
+import { buildImage } from '../sandbox/index.js';
+import { SandboxExecSandbox } from '../sandbox/sandbox-exec.js';
+import { setupPython } from '../sandbox/python.js';
 import type { ClaudeProbe, Runtime } from './app.js';
 import { OutputFormatter } from './output.js';
 import type { VeritasConfig } from './types.js';
@@ -37,6 +40,10 @@ export function createRuntime(): Runtime {
     },
     makeProvider: (config) => new ClaudeCodeProvider({ binary: config.claudeBinary, defaultTimeoutMs: config.agentTimeoutMs }),
     probeClaude,
+    async setupRuntime(home, onStep) {
+      if (SandboxExecSandbox.available()) await setupPython(home, { onStep });
+      else await buildImage(onStep);
+    },
     onInterrupt(handler) {
       process.on('SIGINT', handler);
       return () => { process.off('SIGINT', handler); };

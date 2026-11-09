@@ -9,7 +9,7 @@ import { CLIError, type Command, type CommandContext } from './types.js';
 const GROUPS: { title: string; names: string[] }[] = [
   { title: 'Do work', names: ['run', 'plan', 'approve', 'resume', 'cancel'] },
   { title: 'Look at work', names: ['list', 'status', 'show', 'export', 'cost'] },
-  { title: 'Setup', names: ['config', 'doctor', 'version'] },
+  { title: 'Setup', names: ['setup', 'config', 'doctor', 'version'] },
 ];
 
 export function helpText(commands: readonly Command[], only?: Command): string {
