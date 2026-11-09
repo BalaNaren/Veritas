@@ -3,6 +3,7 @@ import type { EvidenceStore } from '../evidence/evidence-store.js';
 import type { SubtaskRow } from '../storage/models.js';
 import { extractText } from '../tools/extract.js';
 import type { FetchOptions, FetchResult } from '../tools/web-fetch.js';
+import { validateDocFindings } from './doc-findings.js';
 import { validateFindings, type Finding } from './findings.js';
 
 export type Fetcher = (url: string, options?: FetchOptions) => Promise<FetchResult>;
@@ -25,7 +26,7 @@ export interface IngestResult {
   sourcesFailed: number;
 }
 
-const claimKey = (text: string, url: string): string => `${text.toLowerCase().replace(/\s+/g, ' ').trim()}|${url}`;
+const claimKey = (text: string, url: string, location?: number | null): string => `${text.toLowerCase().replace(/\s+/g, ' ').trim()}|${url}|${location ?? ''}`;
 
 /**
  * Turn one research task's findings into stored evidence: fetch each cited page
@@ -34,12 +35,13 @@ const claimKey = (text: string, url: string): string => `${text.toLowerCase().re
  * record, where verification will remove them as unsourced.
  */
 export async function ingestFindings(o: IngestOptions): Promise<IngestResult> {
-  const parsed = validateFindings(o.subtask.output);
+  const parsed = o.subtask.kind === 'document' ? validateDocFindings(o.subtask.output) : validateFindings(o.subtask.output);
   if (!parsed.ok) throw new Error(`Research output for "${o.subtask.key}" is unusable: ${parsed.error}`);
   const findings = parsed.value.findings;
   const result: IngestResult = { claims: 0, duplicates: 0, sourcesFetched: 0, sourcesFailed: 0 };
 
-  const urls = [...new Set(findings.map((f) => f.url))];
+  // Files were read when the task started; only web addresses need fetching.
+  const urls = [...new Set(findings.map((f) => f.url).filter((u) => !u.startsWith('file:')))];
   let next = 0;
   const worker = async (): Promise<void> => {
     while (next < urls.length && !o.signal?.aborted) {
@@ -66,12 +68,12 @@ export async function ingestFindings(o: IngestOptions): Promise<IngestResult> {
   await Promise.all(Array.from({ length: Math.max(1, Math.min(o.concurrency ?? 4, urls.length || 1)) }, worker));
   if (o.signal?.aborted) throw new Error('Cancelled while collecting sources');
 
-  const seen = new Set(o.evidence.listClaims(o.taskId).map((c) => claimKey(c.text, c.url ?? '')));
+  const seen = new Set(o.evidence.listClaims(o.taskId).map((c) => claimKey(c.text, c.url ?? '', c.location)));
   for (const f of findings as Finding[]) {
-    const key = claimKey(f.claim, f.url);
+    const key = claimKey(f.claim, f.url, f.location);
     if (seen.has(key)) { result.duplicates++; continue; }
     seen.add(key);
-    o.evidence.addClaim({ taskId: o.taskId, subtaskId: o.subtask.id, text: f.claim, type: f.type, url: f.url, quote: f.quote, important: f.important });
+    o.evidence.addClaim({ taskId: o.taskId, subtaskId: o.subtask.id, text: f.claim, type: f.type, url: f.url, quote: f.quote, important: f.important, location: f.location ?? null });
     result.claims++;
   }
   o.events.emit(o.taskId, 'evidence.ingested', { key: o.subtask.key, ...result }, o.subtask.id);

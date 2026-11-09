@@ -2,7 +2,7 @@ import { ageInDays } from '../evidence/quality.js';
 import type { CheckResult, ClaimRow, ClaimStatus, EvidenceStore, SourceRow } from '../evidence/evidence-store.js';
 import type { Checker } from './checker.js';
 import { checkNumbers } from './numbers.js';
-import { findQuote, passageAround } from './text-match.js';
+import { findQuote, passageAround, type QuoteMatch } from './text-match.js';
 
 export interface VerifyOptions {
   evidence: EvidenceStore;
@@ -56,7 +56,38 @@ function unexplainedContext<T extends { value: number; raw: string }>(missing: r
 const pass = (step: string, detail: string): CheckResult => ({ step, passed: true, detail });
 const fail = (step: string, detail: string): CheckResult => ({ step, passed: false, detail });
 
-interface Outcome { status: ClaimStatus; reason: string | null; checks: CheckResult[]; sourceId: string | null; start: number | null; end: number | null; costUsd: number }
+interface Outcome { status: ClaimStatus; reason: string | null; checks: CheckResult[]; sourceId: string | null; start: number | null; end: number | null; location: number | null; costUsd: number }
+
+interface Located extends QuoteMatch {
+  /** Page or section the quote was found on (file sources). */
+  location?: number;
+  /** Set when the claim cited a different page than the one the quote is on. */
+  correctedFrom?: string;
+  /** Text window the checker may read. */
+  windowText?: { start: number; end: number };
+}
+
+/** Find a quote in a source. For a file, it must be on the cited page; a quote on another page is found but reported. */
+function locate(source: SourceRow, snapshot: string, claim: ClaimRow): Located {
+  if (source.kind !== 'file' || !source.units?.length) return findQuote(snapshot, claim.quote!);
+  const tryUnit = (u: { start: number; end: number }): QuoteMatch => {
+    const m = findQuote(snapshot.slice(u.start, u.end), claim.quote!);
+    return m.found ? { found: true, start: m.start! + u.start, end: m.end! + u.start } : m;
+  };
+  const cited = claim.location != null ? source.units.find((u) => u.n === claim.location) : undefined;
+  if (claim.location != null && !cited) return { found: false, reason: `${source.title ?? 'The file'} has no page or section ${claim.location}` };
+  if (cited) {
+    const m = tryUnit(cited);
+    if (m.found) return { ...m, location: cited.n, windowText: cited };
+    if (m.reason?.includes('too short')) return m;
+  }
+  for (const u of source.units) {
+    if (u === cited) continue;
+    const m = tryUnit(u);
+    if (m.found) return { ...m, location: u.n, windowText: u, correctedFrom: cited ? cited.label : undefined };
+  }
+  return { found: false, reason: cited ? `The quoted words are not on ${cited.label} or anywhere else in ${source.title ?? 'the file'}` : (findQuote(snapshot, claim.quote!).reason ?? 'The quote is not in the file') };
+}
 
 /**
  * Run the five checks on one claim.
@@ -66,8 +97,9 @@ interface Outcome { status: ClaimStatus; reason: string | null; checks: CheckRes
 async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: readonly SourceRow[], o: VerifyOptions): Promise<Outcome> {
   const checks: CheckResult[] = [];
   let costUsd = 0;
+  let location: number | null = claim.location;
   const done = (status: ClaimStatus, reason: string | null, source: SourceRow | null = null, start: number | null = null, end: number | null = null): Outcome =>
-    ({ status, reason, checks, sourceId: source?.id ?? null, start, end, costUsd });
+    ({ status, reason, checks, sourceId: source?.id ?? null, start, end, location, costUsd });
 
   // 1. The cited source must have been fetched by Veritas during this task.
   const source = claim.url ? o.evidence.findSource(o.taskId, claim.url) : undefined;
@@ -83,12 +115,19 @@ async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: rea
     return done('removed', 'No supporting quote was given', source);
   }
   const snapshot = o.evidence.readSnapshot(source);
-  const match = findQuote(snapshot, claim.quote);
+  const match = locate(source, snapshot, claim);
   if (!match.found) {
     checks.push(fail('quote_matches', match.reason ?? 'The quote is not in the source'));
     return done('removed', 'The quote is not in the source', source);
   }
-  checks.push(pass('quote_matches', `Found at characters ${match.start}-${match.end} of the stored text`));
+  const flags: string[] = [];
+  if (match.location != null) location = match.location;
+  if (match.correctedFrom) {
+    flags.push(`Cited ${match.correctedFrom}, but the quote is on ${source.units!.find((u) => u.n === match.location)!.label}`);
+    checks.push(fail('quote_matches', `The quote is on ${source.units!.find((u) => u.n === match.location)!.label}, not ${match.correctedFrom}`));
+  } else {
+    checks.push(pass('quote_matches', match.location != null ? `Found on ${source.units!.find((u) => u.n === match.location)!.label}` : `Found at characters ${match.start}-${match.end} of the stored text`));
+  }
   const exact = snapshot.slice(match.start!, match.end!);
 
   // 4 (before 3, because it is free): numbers in the claim must be in the quote.
@@ -108,7 +147,8 @@ async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: rea
   }
 
   // 3. An independent checker judges whether the passage supports the claim.
-  const passage = passageAround(snapshot, match.start!, match.end!);
+  const w = match.windowText;
+  const passage = w ? passageAround(snapshot.slice(w.start, w.end), match.start! - w.start, match.end! - w.start) : passageAround(snapshot, match.start!, match.end!);
   const support = await o.checker.support({ claim: claim.text, passage, source: { title: source.title, url: source.finalUrl } });
   costUsd += support.costUsd;
   if (support.verdict === 'not_supported' || support.verdict === 'contradicted') {
@@ -117,7 +157,6 @@ async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: rea
   }
   checks.push(support.verdict === 'supported' ? pass('support', support.reason) : fail('support', `Only partly supported: ${support.reason}`));
 
-  const flags: string[] = [];
   if (support.verdict === 'partial') flags.push('Only partly supported by its source');
   if (numbersReason) flags.push(numbersReason);
 
@@ -173,12 +212,12 @@ export async function verifyClaims(o: VerifyOptions): Promise<VerificationSummar
       } catch (e) {
         // A claim the checker could not judge is never silently accepted.
         const message = e instanceof Error ? e.message : String(e);
-        outcome = { status: 'flagged', reason: `Could not be fully checked: ${message}`, checks: [fail('support', message)], sourceId: null, start: null, end: null, costUsd: 0 };
+        outcome = { status: 'flagged', reason: `Could not be fully checked: ${message}`, checks: [fail('support', message)], sourceId: null, start: null, end: null, location: claim.location, costUsd: 0 };
       }
       costUsd += outcome.costUsd;
       const updated = o.evidence.updateClaim(claim.id, {
         status: outcome.status, reason: outcome.reason, checks: outcome.checks,
-        sourceId: outcome.sourceId, quoteStart: outcome.start, quoteEnd: outcome.end,
+        sourceId: outcome.sourceId, quoteStart: outcome.start, quoteEnd: outcome.end, location: outcome.location,
       });
       o.onClaim?.(updated);
     }

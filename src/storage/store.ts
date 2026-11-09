@@ -21,7 +21,7 @@ function mapTask(r: Row): TaskRow {
     id: r.id as string, slug: r.slug as string, goal: r.goal as string, type: r.type as string,
     status: r.status as TaskStatus, createdAt: r.created_at as string, updatedAt: r.updated_at as string,
     budgetUsd: r.budget_usd as number, spentUsd: r.spent_usd as number, mode: r.mode as string,
-    cwd: r.cwd as string, assumptions: parse<string[]>(r.assumptions, []),
+    cwd: r.cwd as string, assumptions: parse<string[]>(r.assumptions, []), inputs: parse<string[]>(r.inputs, []),
     plan: r.plan == null ? null : parse<Plan | null>(r.plan, null),
     resultPath: (r.result_path as string | null) ?? null, error: (r.error as string | null) ?? null,
   };
@@ -63,6 +63,7 @@ export interface NewTask {
   budgetUsd: number;
   mode: string;
   cwd: string;
+  inputs?: string[];
 }
 
 export interface NewSubtask {
@@ -154,9 +155,9 @@ export class Store {
     const id = newId('task');
     const ts = now();
     this.db.prepare(
-      `INSERT INTO tasks (id, slug, goal, type, status, created_at, updated_at, budget_usd, spent_usd, mode, cwd, assumptions)
-       VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 0, ?, ?, '[]')`,
-    ).run(id, input.slug, input.goal, input.type, ts, ts, input.budgetUsd, input.mode, input.cwd);
+      `INSERT INTO tasks (id, slug, goal, type, status, created_at, updated_at, budget_usd, spent_usd, mode, cwd, assumptions, inputs)
+       VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 0, ?, ?, '[]', ?)`,
+    ).run(id, input.slug, input.goal, input.type, ts, ts, input.budgetUsd, input.mode, input.cwd, j(input.inputs ?? []));
     return this.getTask(id)!;
   }
 

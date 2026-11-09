@@ -7,6 +7,8 @@ import type { SubtaskRow, TaskRow } from '../storage/models.js';
 import type { EventLog } from './event-log.js';
 import { getKind } from './kinds.js';
 import { tryJsonParse } from '../shared/json.js';
+import { join } from 'node:path';
+import { taskDir } from '../storage/paths.js';
 import { goalWithContext, workerPrompt, type DependencyResult } from './prompts.js';
 
 export type RunOutcome =
@@ -20,7 +22,7 @@ export interface SchedulerOptions {
   events: EventLog;
   provider: ModelProvider;
   budget: Budget;
-  config: Pick<VeritasConfig, 'models' | 'maxConcurrent' | 'agentTimeoutMs'>;
+  config: Pick<VeritasConfig, 'models' | 'maxConcurrent' | 'agentTimeoutMs' | 'homeDir'>;
   task: TaskRow;
   signal?: AbortSignal;
   /** Attempts per task, including the first (default 2). */
@@ -68,6 +70,8 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
       const d = byKey.get(k)!;
       return { key: d.key, title: d.title, text: typeof d.output === 'string' ? d.output : JSON.stringify(d.output ?? '') };
     });
+    // Agents that read files run inside the folder of extracted text, so that is all they can see.
+    const agentCwd = kind.fileAccess ? join(taskDir(opts.config.homeDir, task.id), 'files') : task.cwd;
     const prompt = workerPrompt(goalWithContext(task.goal, task.assumptions), s, deps, kind.guidance);
 
     store.updateSubtask(s.id, { status: 'running', startedAt: new Date().toISOString(), model });
@@ -83,7 +87,8 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
       attempt++;
       store.updateSubtask(s.id, { attempts: attempt });
       let res: AgentRunResult = await provider.run({
-        prompt, model, cwd: task.cwd, tools: kind.tools, allowedTools: kind.allowedTools, jsonSchema: kind.outputSchema,
+        prompt, model, cwd: agentCwd, addDirs: kind.fileAccess ? [agentCwd] : undefined,
+        tools: kind.tools, allowedTools: kind.allowedTools, jsonSchema: kind.outputSchema,
         maxBudgetUsd: currentCap, timeoutMs: opts.config.agentTimeoutMs, signal,
       });
       totalCost += res.costUsd;

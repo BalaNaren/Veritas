@@ -5,10 +5,13 @@ export type FindingType = 'fact' | 'number' | 'quote';
 export interface Finding {
   claim: string;
   type: FindingType;
+  /** Web address, or `file:<name>` for a file the user supplied. */
   url: string;
   title: string;
   quote: string;
   publishedAt?: string;
+  /** Page or section number, for findings from files. */
+  location?: number;
   /** The agent's own view that the report depends on this claim. */
   important: boolean;
 }

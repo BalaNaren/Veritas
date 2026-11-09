@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { extname, join, resolve } from 'node:path';
+import { EXTENSIONS } from '../../documents/types.js';
 import { formatUsd } from '../../cost/estimate.js';
 import type { ClarifyQuestion } from '../../clarify/clarifier.js';
 import type { Approver, ClarifyOptions } from '../../engine/engine.js';
@@ -140,6 +142,32 @@ const budgetFrom = (ctx: CommandContext): number | undefined => {
 const clarifyMode = (ctx: CommandContext, interactive: boolean): 'off' | 'defaults' | 'ask' =>
   ctx.flags.quick === true ? 'off' : interactive ? 'ask' : ctx.flags.clarify === true ? 'defaults' : 'off';
 
+const MAX_FILES = 100;
+
+/** Files given with --file (repeatable). A folder stands for the supported files directly inside it. */
+function filesFrom(ctx: CommandContext, cwd: string): string[] | undefined {
+  const raw = ctx.flags.file;
+  if (raw === undefined) return undefined;
+  const given = (Array.isArray(raw) ? raw : [raw]).map(String);
+  if (given.some((g) => g === 'true' || !g.trim())) throw new ValidationError('--file needs a file or folder name.');
+  const out: string[] = [];
+  for (const g of given) {
+    const path = resolve(cwd, g);
+    let info;
+    try { info = statSync(path); } catch { throw new ValidationError(`Cannot find ${g}.`); }
+    if (info.isDirectory()) {
+      const inside = readdirSync(path).filter((n) => !n.startsWith('.') && EXTENSIONS[extname(n).toLowerCase()]).sort().map((n) => join(path, n));
+      if (!inside.length) throw new ValidationError(`${g} has no supported files (${Object.keys(EXTENSIONS).join(' ')}).`);
+      out.push(...inside);
+    } else if (!EXTENSIONS[extname(path).toLowerCase()]) {
+      throw new ValidationError(`${g}: this file type is not supported (supported: ${Object.keys(EXTENSIONS).join(' ')}).`);
+    } else out.push(path);
+  }
+  const unique = [...new Set(out)];
+  if (unique.length > MAX_FILES) throw new ValidationError(`At most ${MAX_FILES} files per task (got ${unique.length}).`);
+  return unique;
+}
+
 const exit = (code: number): CommandResult => ({ success: code === 0, exitCode: code });
 
 export function runCommands(app: App): Command[] {
@@ -151,12 +179,13 @@ export function runCommands(app: App): Command[] {
       options: [
         { name: 'budget', type: 'number', description: 'Spending limit in US dollars (default from config)' },
         { name: 'yes-plan', type: 'boolean', description: 'Approve the plan without asking (budget increases still always ask)' },
+        { name: 'file', type: 'array', description: 'A file or folder to work on (repeat for several): PDF, Word, Excel, CSV, text, Markdown or JSON' },
         { name: 'quick', type: 'boolean', description: 'Skip the clarifying questions' },
         { name: 'clarify', type: 'boolean', description: 'When not interactive, still check the goal and record default answers as assumptions' },
       ],
       examples: [{ command: 'veritas run "Summarise the main causes of the 2008 crisis" --budget 1', description: 'Run with a $1 limit' }],
       action: async (ctx) => {
-        const task = app.engine().createTask(goalFrom(ctx), { budgetUsd: budgetFrom(ctx), cwd: app.rt.cwd });
+        const task = app.engine().createTask(goalFrom(ctx), { budgetUsd: budgetFrom(ctx), cwd: app.rt.cwd, files: filesFrom(ctx, app.rt.cwd) });
         app.rt.out.writeln(app.rt.out.dim(`Task ${task.id}`));
         return exit(await drive(app, task.id, { yesPlan: ctx.flags.yesPlan === true, interactive: interactive(ctx), clarify: clarifyMode(ctx, interactive(ctx)) }));
       },
@@ -166,10 +195,11 @@ export function runCommands(app: App): Command[] {
       description: 'Plan a goal and show the plan and cost estimate without running anything',
       options: [
         { name: 'budget', type: 'number', description: 'Spending limit in US dollars' },
+        { name: 'file', type: 'array', description: 'A file or folder to work on (repeat for several)' },
         { name: 'clarify', type: 'boolean', description: 'Check the goal first and record default answers as assumptions' },
       ],
       action: async (ctx) => {
-        const task = app.engine().createTask(goalFrom(ctx), { budgetUsd: budgetFrom(ctx), cwd: app.rt.cwd });
+        const task = app.engine().createTask(goalFrom(ctx), { budgetUsd: budgetFrom(ctx), cwd: app.rt.cwd, files: filesFrom(ctx, app.rt.cwd) });
         app.rt.out.writeln(app.rt.out.dim(`Task ${task.id}`));
         return exit(await drive(app, task.id, { interactive: false, clarify: clarifyMode(ctx, false) }));
       },

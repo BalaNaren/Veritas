@@ -229,8 +229,16 @@ export class CommandParser {
       if (parsingFlags && arg.startsWith('-')) {
         const parseResult = this.parseFlag(args, i, aliases, booleanFlags, stringFlags);
 
-        // Apply to result flags
-        Object.assign(result.flags, parseResult.flags);
+        // Apply to result flags. Flags declared as arrays collect every value given.
+        for (const [key, value] of Object.entries(parseResult.flags)) {
+          if (key === '_') continue;
+          if (this.options.arrayFlags?.includes(key) && typeof value === 'string') {
+            const before = result.flags[key];
+            result.flags[key] = [...(Array.isArray(before) ? before : []), value];
+          } else {
+            result.flags[key] = value;
+          }
+        }
         i = parseResult.nextIndex;
         continue;
       }

@@ -119,4 +119,10 @@ export const MIGRATIONS: readonly string[] = [
     PRIMARY KEY (task_id, url)
   );
   `,
+  // 4: input files for a task, and citable units (pages, sections) within file sources and claims
+  `
+  ALTER TABLE tasks ADD COLUMN inputs TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE sources ADD COLUMN units TEXT;
+  ALTER TABLE claims ADD COLUMN location INTEGER;
+  `,
 ];

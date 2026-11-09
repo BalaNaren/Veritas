@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { ReadDocument } from '../documents/types.js';
 import { ensureDir, writeFileAtomic } from '../shared/fs.js';
 import { newId } from '../shared/ids.js';
 import { safeJsonParse } from '../shared/json.js';
@@ -10,6 +11,9 @@ import { rateSource, type SourceQuality } from './quality.js';
 
 type Row = Record<string, unknown>;
 
+/** Where one citable part of a file sits inside its stored snapshot text. */
+export interface SourceUnit { n: number; label: string; start: number; end: number }
+
 export interface SourceRow {
   id: string;
   taskId: string;
@@ -18,6 +22,7 @@ export interface SourceRow {
   /** The address finally fetched, after redirects. */
   finalUrl: string;
   title: string | null;
+  /** `web` for pages Veritas fetched, `file` for files the user supplied. */
   kind: string;
   fetchedAt: string;
   contentType: string | null;
@@ -30,6 +35,8 @@ export interface SourceRow {
   publishedAt: string | null;
   quality: SourceQuality;
   qualityReason: string | null;
+  /** Pages or sections of a file source; null for web pages. */
+  units: SourceUnit[] | null;
 }
 
 export type ClaimType = 'fact' | 'number' | 'quote';
@@ -57,6 +64,8 @@ export interface ClaimRow {
   sourceId: string | null;
   quoteStart: number | null;
   quoteEnd: number | null;
+  /** The page or section number (of a file source) the claim cites. */
+  location: number | null;
   status: ClaimStatus;
   checks: CheckResult[];
   reason: string | null;
@@ -87,6 +96,8 @@ export interface NewClaim {
   url?: string | null;
   quote?: string | null;
   important?: boolean;
+  /** Page or section number within a file source. */
+  location?: number | null;
 }
 
 export interface ClaimPatch {
@@ -94,9 +105,13 @@ export interface ClaimPatch {
   sourceId?: string | null;
   quoteStart?: number | null;
   quoteEnd?: number | null;
+  location?: number | null;
   checks?: CheckResult[];
   reason?: string | null;
 }
+
+/** The identifier a file source goes by in claims. */
+export const fileUrl = (name: string): string => `file:${name}`;
 
 /** Compare addresses without the part after `#`, which never reaches the server. */
 export function normalizeUrl(url: string): string {
@@ -111,6 +126,7 @@ const mapSource = (r: Row): SourceRow => ({
   contentType: (r.content_type as string | null) ?? null, bytes: r.bytes as number, sha256: r.sha256 as string,
   textSha256: r.text_sha256 as string, snapshotPath: r.snapshot_path as string, publishedAt: (r.published_at as string | null) ?? null,
   quality: r.quality as SourceQuality, qualityReason: (r.quality_reason as string | null) ?? null,
+  units: r.units ? safeJsonParse<SourceUnit[]>(r.units as string) : null,
 });
 
 const mapClaim = (r: Row): ClaimRow => ({
@@ -118,6 +134,7 @@ const mapClaim = (r: Row): ClaimRow => ({
   text: r.text as string, type: r.type as ClaimType, url: (r.url as string | null) ?? null, quote: (r.quote as string | null) ?? null,
   important: r.important === 1, sourceId: (r.source_id as string | null) ?? null,
   quoteStart: (r.quote_start as number | null) ?? null, quoteEnd: (r.quote_end as number | null) ?? null,
+  location: (r.location as number | null) ?? null,
   status: r.status as ClaimStatus, checks: safeJsonParse<CheckResult[]>((r.checks as string) ?? '[]'), reason: (r.reason as string | null) ?? null,
 });
 
@@ -142,6 +159,35 @@ export class EvidenceStore {
       sha256(input.text), path, input.publishedAt ?? null, rating.quality, rating.reason);
     const created = this.getSource(id)!;
     this.addAliases(created, [input.url, input.finalUrl, ...(input.aliases ?? [])]);
+    return created;
+  }
+
+  /**
+   * Register a file the user supplied. The snapshot is the text Veritas extracted, with a marker line before each
+   * page or section; it is also what agents read, so every quote can be checked against the same text.
+   */
+  addFileSource(taskId: string, doc: ReadDocument): SourceRow {
+    const url = fileUrl(doc.name);
+    const existing = this.findSource(taskId, url);
+    if (existing) return existing;
+    const id = newId('src');
+    const dir = join(taskDir(this.home, taskId), 'files');
+    ensureDir(dir);
+    let text = `# File: ${doc.name} (${doc.kind})\n`;
+    const units: SourceUnit[] = [];
+    for (const u of doc.units) {
+      text += `\n=== ${u.label} ===\n`;
+      units.push({ n: u.n, label: u.label, start: text.length, end: text.length + u.text.length });
+      text += u.text + '\n';
+    }
+    const path = join(dir, `${id}.txt`);
+    writeFileAtomic(path, text);
+    this.store.db.prepare(
+      `INSERT INTO sources (id, task_id, url, final_url, title, kind, fetched_at, content_type, bytes, sha256, text_sha256, snapshot_path, published_at, quality, quality_reason, units)
+       VALUES (?, ?, ?, ?, ?, 'file', ?, ?, ?, ?, ?, ?, NULL, 'primary', 'A file you supplied', ?)`,
+    ).run(id, taskId, url, url, doc.name, new Date().toISOString(), doc.kind, doc.bytes, doc.sha256, sha256(text), path, JSON.stringify(units));
+    const created = this.getSource(id)!;
+    this.addAliases(created, [url]);
     return created;
   }
 
@@ -179,8 +225,8 @@ export class EvidenceStore {
     const id = newId('claim');
     const next = (this.store.db.prepare('SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM claims WHERE task_id = ?').get(input.taskId) as Row).n as number;
     this.store.db.prepare(
-      `INSERT INTO claims (id, task_id, subtask_id, seq, text, type, url, quote, important) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, input.taskId, input.subtaskId ?? null, next, input.text, input.type, input.url ?? null, input.quote ?? null, input.important ? 1 : 0);
+      `INSERT INTO claims (id, task_id, subtask_id, seq, text, type, url, quote, important, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(id, input.taskId, input.subtaskId ?? null, next, input.text, input.type, input.url ?? null, input.quote ?? null, input.important ? 1 : 0, input.location ?? null);
     return this.getClaim(id)!;
   }
 
@@ -204,6 +250,7 @@ export class EvidenceStore {
     if (patch.sourceId !== undefined) add('source_id', patch.sourceId);
     if (patch.quoteStart !== undefined) add('quote_start', patch.quoteStart);
     if (patch.quoteEnd !== undefined) add('quote_end', patch.quoteEnd);
+    if (patch.location !== undefined) add('location', patch.location);
     if (patch.checks !== undefined) add('checks', JSON.stringify(patch.checks));
     if (patch.reason !== undefined) add('reason', patch.reason);
     if (sets.length) this.store.db.prepare(`UPDATE claims SET ${sets.join(', ')} WHERE id = ?`).run(...params, id);

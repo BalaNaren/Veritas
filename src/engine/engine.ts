@@ -12,6 +12,10 @@ import type { Store } from '../storage/store.js';
 import { EventLog } from './event-log.js';
 import { answersToStatements, clarifyGoal, type ClarifyQuestion } from '../clarify/clarifier.js';
 import { planGoal } from './planner.js';
+import { basename } from 'node:path';
+import { DocumentError } from '../documents/types.js';
+import { readDocument } from '../documents/readers.js';
+import { EvidenceStore, fileUrl } from '../evidence/evidence-store.js';
 import { runSubtasks } from './scheduler.js';
 import { finishResearch } from './research-pipeline.js';
 import { fetchUrl } from '../tools/web-fetch.js';
@@ -54,11 +58,23 @@ export interface ExecuteOptions {
 export interface NewTaskOptions {
   budgetUsd?: number;
   cwd?: string;
+  /** Absolute paths of files the task should work on. */
+  files?: string[];
 }
 
 export type ExecuteResult = { task: TaskRow; resultPath?: string };
 
 const HUMAN = 'user';
+
+/** Task types whose results go through evidence collection, verification and writing. */
+const EVIDENCE_TASK_TYPES = ['research', 'documents', 'mixed'];
+
+function taskTypeFor(kinds: readonly string[]): string {
+  const web = kinds.includes('research');
+  const docs = kinds.includes('document');
+  if (web && docs) return 'mixed';
+  return docs ? 'documents' : web ? 'research' : 'general';
+}
 
 export class Engine {
   readonly store: Store;
@@ -86,7 +102,7 @@ export class Engine {
     if (!text) throw new Error('The goal is empty.');
     const task = this.store.createTask({
       slug: slugify(text), goal: text, type: 'general', mode: this.provider.id,
-      budgetUsd: opts.budgetUsd ?? this.config.defaultBudgetUsd, cwd: opts.cwd ?? process.cwd(),
+      budgetUsd: opts.budgetUsd ?? this.config.defaultBudgetUsd, cwd: opts.cwd ?? process.cwd(), inputs: opts.files ?? [],
     });
     this.events.emit(task.id, 'task.created', { goal: text, budgetUsd: task.budgetUsd });
     return task;
@@ -118,6 +134,8 @@ export class Engine {
     const needsPlan = task.status === 'draft' || task.status === 'clarifying'
       || (task.status === 'paused' && this.store.listSubtasks(task.id).length === 0);
     if (needsPlan) {
+      const prepared = await this.prepareFiles(task);
+      if (prepared) return { task: prepared };
       if (opts.clarify && opts.clarify.mode !== 'off') {
         task = await this.clarify(task, opts.clarify, signal);
         if (task.status === 'paused') return { task };
@@ -143,6 +161,26 @@ export class Engine {
   }
 
   // ------------------------------------------------------------------
+
+  /** Read the user's files once, store their text, and make them citable. Returns the failed task if one cannot be read. */
+  private async prepareFiles(task: TaskRow): Promise<TaskRow | undefined> {
+    if (!task.inputs.length) return undefined;
+    const evidence = new EvidenceStore(this.store, this.config.homeDir);
+    for (const path of task.inputs) {
+      const name = basename(path);
+      if (evidence.findSource(task.id, fileUrl(name))) continue;
+      try {
+        const doc = await readDocument(path, name);
+        const source = evidence.addFileSource(task.id, doc);
+        this.events.emit(task.id, 'file.read', { name, kind: doc.kind, parts: doc.units.length, sourceId: source.id });
+      } catch (e) {
+        const error = e instanceof DocumentError ? e.message : `${name}: ${e instanceof Error ? e.message : String(e)}`;
+        this.events.emit(task.id, 'task.failed', { error });
+        return this.store.updateTask(task.id, { status: 'failed', error });
+      }
+    }
+    return undefined;
+  }
 
   private async clarify(task: TaskRow, options: ClarifyOptions, signal?: AbortSignal): Promise<TaskRow> {
     const done = this.store.listEvents(task.id).some((e) => e.type === 'clarify.answered' || e.type === 'clarify.skipped');
@@ -181,6 +219,8 @@ export class Engine {
     const outcome = await planGoal(task.goal, {
       provider: this.provider, config: this.config, cwd: task.cwd, signal,
       history: this.store.averageSubtaskCostByModel(), decided: task.assumptions,
+      files: new EvidenceStore(this.store, this.config.homeDir).listSources(task.id).filter((s) => s.kind === 'file')
+        .map((s) => ({ name: s.title ?? s.url, kind: s.contentType ?? 'file', units: s.units?.length ?? 0 })),
     });
     if (outcome.costUsd > 0) this.store.addSpent(task.id, outcome.costUsd);
     if (!outcome.ok) {
@@ -197,7 +237,7 @@ export class Engine {
       this.store.createSubtasks(task.id, plan.subtasks);
       this.store.updateTask(task.id, {
         status: 'planned', plan, assumptions: plan.assumptions,
-        type: plan.subtasks.every((s) => s.kind === 'research') ? 'research' : 'general',
+        type: taskTypeFor(plan.subtasks.map((s) => s.kind)),
       });
     });
     this.events.emit(task.id, 'plan.created', {
@@ -276,7 +316,7 @@ export class Engine {
         return { task: this.store.updateTask(task.id, { status: 'paused' }) };
       }
       const finished = this.require(task.id);
-      if (finished.type === 'research') return this.finishResearchTask(finished, signal);
+      if (EVIDENCE_TASK_TYPES.includes(finished.type)) return this.finishResearchTask(finished, signal);
       return this.finish(finished);
     }
   }

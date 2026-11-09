@@ -22,6 +22,8 @@ export interface TaskRow {
   mode: string;
   cwd: string;
   assumptions: string[];
+  /** Absolute paths of the files the user gave this task. */
+  inputs: string[];
   plan: Plan | null;
   resultPath: string | null;
   error: string | null;

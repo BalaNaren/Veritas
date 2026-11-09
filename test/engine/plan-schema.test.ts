@@ -48,6 +48,6 @@ describe('research plans', () => {
     expect(validatePlanDraft({ subtasks: [r('a'), r('b')], assumptions: [] }, lim).ok).toBe(true);
     const mixed = validatePlanDraft({ subtasks: [r('a'), { ...r('b'), kind: 'general' }], assumptions: [] }, lim);
     expect(mixed.ok).toBe(false);
-    if (!mixed.ok) expect(mixed.errors.join(' ')).toMatch(/only research tasks/);
+    if (!mixed.ok) expect(mixed.errors.join(' ')).toMatch(/only those kinds/);
   });
 });

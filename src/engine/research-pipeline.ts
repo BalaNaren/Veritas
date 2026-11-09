@@ -13,6 +13,7 @@ import { summarize, verifyClaims } from '../verify/verifier.js';
 import { renderMarkdown } from '../write/render.js';
 import { writeReport } from '../write/writer.js';
 import type { EventLog } from './event-log.js';
+import { EVIDENCE_KINDS } from './kinds.js';
 
 export interface PipelineDeps {
   store: Store;
@@ -53,7 +54,7 @@ export async function finishResearch(d: PipelineDeps, task: TaskRow, signal?: Ab
   // 1. Collect the evidence ourselves.
   const already = new Set(events.history(task.id).filter((e) => e.type === 'evidence.ingested').map((e) => e.subtaskId));
   for (const sub of store.listSubtasks(task.id)) {
-    if (sub.status !== 'done' || sub.kind !== 'research' || already.has(sub.id)) continue;
+    if (sub.status !== 'done' || !EVIDENCE_KINDS.includes(sub.kind) || already.has(sub.id)) continue;
     try {
       await ingestFindings({ evidence, fetcher: d.fetcher, events, taskId: task.id, subtask: sub, signal, concurrency: d.config.maxConcurrent });
     } catch (e) {

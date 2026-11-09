@@ -45,8 +45,9 @@ export function renderMarkdown(r: ReportInput): string {
     for (const [seq, n] of [...numberOf].sort((a, b) => a[1] - b[1])) {
       const c = bySeq.get(seq)!;
       const s = c.sourceId ? bySource.get(c.sourceId) : undefined;
-      const label = s ? `${s.title ? oneLine(s.title) : s.finalUrl} — ${s.finalUrl}` : (c.url ?? 'unknown source');
-      const tags = s ? `${s.quality === 'unrated' ? 'unrated source' : s.quality === 'low' ? 'low-confidence source' : `${s.quality} source`}, fetched ${s.fetchedAt.slice(0, 10)}${s.publishedAt ? `, dated ${s.publishedAt.slice(0, 10)}` : ''}` : '';
+      const unit = s?.kind === 'file' && c.location != null ? s.units?.find((u) => u.n === c.location)?.label : undefined;
+      const label = s?.kind === 'file' ? `${s.title ?? 'file'}${unit ? ` — ${unit}` : ''}` : s ? `${s.title ? oneLine(s.title) : s.finalUrl} — ${s.finalUrl}` : (c.url ?? 'unknown source');
+      const tags = s?.kind === 'file' ? 'your file' : s ? `${s.quality === 'unrated' ? 'unrated source' : s.quality === 'low' ? 'low-confidence source' : `${s.quality} source`}, fetched ${s.fetchedAt.slice(0, 10)}${s.publishedAt ? `, dated ${s.publishedAt.slice(0, 10)}` : ''}` : '';
       out.push(`${n}. ${label}${tags ? ` (${tags})` : ''}`, `   > ${oneLine(c.quote ?? '')}`);
       if (c.status === 'flagged') out.push(`   ⚠ Flagged: ${c.reason ?? 'see verification summary'}`);
     }

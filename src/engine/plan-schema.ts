@@ -1,3 +1,4 @@
+import { EVIDENCE_KINDS } from './kinds.js';
 import type { PlannedSubtask } from './plan.js';
 
 export interface PlanDraft {
@@ -89,9 +90,9 @@ export function validatePlanDraft(value: unknown, limits: PlanLimits): PlanValid
     }
   }
   if (!errors.length && hasCycle(subtasks)) errors.push('The tasks depend on each other in a circle.');
-  const researchCount = subtasks.filter((x) => x.kind === 'research').length;
-  if (researchCount && researchCount !== subtasks.length) {
-    errors.push('A plan that uses research tasks must use only research tasks (Veritas writes the final report itself from the checked findings).');
+  const evidenceCount = subtasks.filter((x) => EVIDENCE_KINDS.includes(x.kind)).length;
+  if (evidenceCount && evidenceCount !== subtasks.length) {
+    errors.push('A plan that uses research or document tasks must use only those kinds (Veritas writes the final report itself from the checked findings).');
   }
 
   const assumptionsRaw = value.assumptions ?? [];

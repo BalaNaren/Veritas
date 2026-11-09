@@ -38,7 +38,7 @@ export async function main(argv: string[], rt: Runtime): Promise<number> {
   const app = new App(rt);
   try {
     const commands = [...runCommands(app), ...inspectCommands(app), ...adminCommands(app)];
-    const parser = new CommandParser({ allowUnknownFlags: false });
+    const parser = new CommandParser({ allowUnknownFlags: false, arrayFlags: ['file'] });
     for (const c of commands) parser.registerCommand(c);
     const parsed = parser.parse(argv);
     const flags = parsed.flags;

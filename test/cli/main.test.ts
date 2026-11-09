@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -202,5 +202,18 @@ describe('veritas CLI', () => {
     await p.run('plan', GOAL);
     expect(await p.run('export', idOf(p.out()))).toBe(1);
     expect(p.err()).toMatch(/no finished report/);
+  });
+
+  it('checks --file arguments before creating a task', async () => {
+    const h = harness();
+    expect(await h.run('run', 'summarise', '--file', join(h.home, 'nope.pdf'))).toBe(1);
+    expect(h.err()).toMatch(/Cannot find/);
+    writeFileSync(join(h.home, 'pic.png'), 'x');
+    expect(await h.run('run', 'summarise', '--file', join(h.home, 'pic.png'))).toBe(1);
+    expect(h.err()).toMatch(/not supported/);
+    expect(await h.run('run', 'summarise', '--file', h.home)).toBe(1); // a folder with no supported files
+    expect(h.err()).toMatch(/no supported files/);
+    expect(await h.run('list')).toBe(0);
+    expect(h.out()).toContain('No tasks yet');
   });
 });

@@ -76,3 +76,13 @@ describe('CommandParser', () => {
     expect(r.positional).toContain('nope');
   });
 });
+
+describe('array flags', () => {
+  it('collects every value of a repeated flag', () => {
+    const p = new CommandParser({ allowUnknownFlags: false, arrayFlags: ['file'] });
+    p.registerCommand({ name: 'run', description: 'r', options: [{ name: 'file', type: 'array', description: 'f' }] });
+    expect(p.parse(['run', 'goal', '--file', 'a.pdf', '--file', 'b.pdf']).flags.file).toEqual(['a.pdf', 'b.pdf']);
+    expect(p.parse(['run', '--file=a.pdf', 'goal']).flags.file).toEqual(['a.pdf']);
+    expect(p.parse(['run', 'goal']).positional).toEqual(['goal']);
+  });
+});
