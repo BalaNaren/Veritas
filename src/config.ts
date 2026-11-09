@@ -17,6 +17,7 @@ export function defaultConfig(home: string): VeritasConfig {
     defaultBudgetUsd: 2,
     maxSubtasks: 8,
     agentTimeoutMs: 10 * 60_000,
+    memoryEnabled: true,
     cli: { colorOutput: true, interactive: true, verbosity: 'normal', outputFormat: 'text', progressStyle: 'bar' },
   };
 }
@@ -99,7 +100,7 @@ export function flattenConfig(config: VeritasConfig): Record<string, string | nu
 export const SETTABLE_KEYS = [
   'models.planner', 'models.clarifier', 'models.worker', 'models.checker', 'models.writer',
   'maxConcurrent', 'defaultBudgetUsd', 'maxSubtasks', 'agentTimeoutMs', 'claudeBinary',
-  'cli.colorOutput', 'cli.verbosity',
+  'memoryEnabled', 'cli.colorOutput', 'cli.verbosity',
 ] as const;
 
 /** Return a copy of `config` with one dotted key changed (value given as text). Validates the result. */

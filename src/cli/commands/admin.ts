@@ -1,6 +1,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { loadConfig, flattenConfig, setConfigValue, configPath, SETTABLE_KEYS } from '../../config.js';
 import { dbPath, ensureHome } from '../../storage/paths.js';
+import { MemoryStore, type MemoryKind } from '../../memory/memory-store.js';
 import { chooseSandbox } from '../../sandbox/index.js';
 import { PINNED_PACKAGES, venvDir } from '../../sandbox/python.js';
 import { SandboxExecSandbox } from '../../sandbox/sandbox-exec.js';
@@ -8,6 +9,7 @@ import { Store } from '../../storage/store.js';
 import { PRODUCT_NAME, VERSION } from '../../version.js';
 import type { App } from '../app.js';
 import { ValidationError, type Command, type CommandResult } from '../types.js';
+import { truncate } from '../format.js';
 
 const ok: CommandResult = { success: true };
 const MIN_NODE = [22, 13];
@@ -82,6 +84,54 @@ export function adminCommands(app: App): Command[] {
           return ok;
         }
         throw new ValidationError(`Unknown config command "${sub}". Use list, get, set or path.`);
+      },
+    },
+    {
+      name: 'memory',
+      description: 'See or erase what Veritas remembers between tasks: memory [list | search <words> | forget <id> | clear]',
+      options: [
+        { name: 'kind', type: 'string', description: 'source or preference', choices: ['source', 'preference'] },
+        { name: 'yes', type: 'boolean', description: 'Do not ask before clearing' },
+      ],
+      action: async (ctx) => {
+        const [sub = 'list', ...rest] = ctx.args;
+        const mem = new MemoryStore(app.store);
+        const kind = ctx.flags.kind as MemoryKind | undefined;
+        const show = (items: ReturnType<MemoryStore['list']>): void => {
+          if (!items.length) { out.writeln('Nothing remembered.'); return; }
+          out.writeln(out.table({
+            columns: [{ key: 'id', header: 'Id', width: 20 }, { key: 'kind', header: 'Kind', width: 10 }, { key: 'text', header: 'Remembered', width: 70 }, { key: 'uses', header: 'Used', width: 5, align: 'right' }],
+            data: items.map((m) => ({ id: m.id, kind: m.kind, text: truncate(m.text, 70), uses: m.uses })),
+          }));
+        };
+        if (sub === 'list') {
+          out.writeln(app.config.memoryEnabled ? 'Memory is on. It is stored only on this computer. Turn it off with: veritas config set memoryEnabled false' : out.warning('Memory is off: nothing new is remembered or used. Turn it on with: veritas config set memoryEnabled true'));
+          show(mem.list(kind));
+          return ok;
+        }
+        if (sub === 'search') {
+          if (!rest.length) throw new ValidationError('Usage: veritas memory search <words>');
+          show(mem.search(rest.join(' '), { kind, limit: 20 }));
+          return ok;
+        }
+        if (sub === 'forget') {
+          if (!rest[0]) throw new ValidationError('Usage: veritas memory forget <id>');
+          if (!mem.forget(rest[0])) throw new ValidationError(`Nothing is remembered under ${rest[0]}.`);
+          out.writeln('Forgotten.');
+          return ok;
+        }
+        if (sub === 'clear') {
+          const n = mem.count();
+          if (!n) { out.writeln('Nothing remembered.'); return ok; }
+          if (ctx.flags.yes !== true) {
+            if (!app.rt.interactive) throw new ValidationError('Run this in a terminal, or pass --yes to confirm.');
+            const a = (await app.rt.ask(`Erase all ${n} remembered item${n === 1 ? '' : 's'}? [y/N] `)).trim().toLowerCase();
+            if (a !== 'y' && a !== 'yes') { out.writeln('Nothing was erased.'); return ok; }
+          }
+          out.writeln(`Erased ${mem.clear(kind)} item${n === 1 ? '' : 's'}.`);
+          return ok;
+        }
+        throw new ValidationError(`Unknown memory command "${sub}". Use list, search, forget or clear.`);
       },
     },
     {

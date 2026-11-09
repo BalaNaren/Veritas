@@ -19,6 +19,8 @@ export interface PlannerOptions {
   decided?: readonly string[];
   /** Files the user supplied (already read), so the planner can use document tasks. */
   files?: readonly FileSummary[];
+  /** Things remembered from earlier tasks that may help (preferences, useful sources). */
+  hints?: readonly string[];
   /** True when analysis code can be run (a sandbox is set up), so the data kind may be used. */
   dataAvailable?: boolean;
   signal?: AbortSignal;
@@ -37,7 +39,7 @@ export async function planGoal(goal: string, opts: PlannerOptions): Promise<Plan
   const model = modelFor('planner', opts.config.models);
   let cost = 0;
   const fullGoal = goalWithContext(goal, opts.decided ?? []);
-  let prompt = plannerPrompt(fullGoal, limits.maxSubtasks, limits.kinds, opts.files);
+  let prompt = plannerPrompt(fullGoal, limits.maxSubtasks, limits.kinds, opts.files, opts.hints);
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const res: AgentRunResult = await opts.provider.run({
@@ -62,7 +64,7 @@ export async function planGoal(goal: string, opts: PlannerOptions): Promise<Plan
       };
     }
     if (attempt === 2) return { ok: false, error: `The planner returned an invalid plan: ${check.errors.join(' ')}`, costUsd: cost };
-    prompt = plannerRetryPrompt(fullGoal, limits.maxSubtasks, limits.kinds, check.errors, opts.files);
+    prompt = plannerRetryPrompt(fullGoal, limits.maxSubtasks, limits.kinds, check.errors, opts.files, opts.hints);
   }
   return { ok: false, error: 'Planning failed.', costUsd: cost };
 }

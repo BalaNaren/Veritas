@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { AgentRunRequest, AgentRunResult, ModelProvider } from '../../src/agents/provider.js';
 import { defaultConfig } from '../../src/config.js';
 import { Engine, type Approver } from '../../src/engine/engine.js';
+import { MemoryStore } from '../../src/memory/memory-store.js';
 import { Store } from '../../src/storage/store.js';
 import { isBlockedIp } from '../../src/tools/net-guard.js';
 import { createFetcher } from '../../src/tools/web-fetch.js';
@@ -87,6 +88,24 @@ describe('research pipeline', () => {
     expect(store.db.prepare("SELECT COUNT(*) AS n FROM claims WHERE status = 'confirmed'").get()).toMatchObject({ n: 2 });
     expect(p.kinds.filter((k) => k === 'writer')).toHaveLength(1);
     expect(r.task.spentUsd).toBeCloseTo(0.05 + 0.2 + 2 * 0.005 * 1 + 0.2, 1);
+  });
+
+  it('remembers the pages that backed confirmed claims, and offers them as unverified hints next time', async () => {
+    const seenPrompts: string[] = [];
+    const p = provider({ onRequest: (r) => { seenPrompts.push(r.prompt); } });
+    const { engine, store, task } = setup(p);
+    await engine.execute(task.id, { approver: yes });
+    const mem = new MemoryStore(store);
+    const sources = mem.list('source');
+    expect(sources).toHaveLength(1);
+    expect(sources[0]!.key).toBe(url('/moon'));
+    expect(sources[0]!.text).toContain('Moon facts');
+    seenPrompts.length = 0;
+    const second = engine.createTask('How far away is the Moon from Earth?');
+    await engine.execute(second.id, { approver: yes });
+    const planning = seenPrompts.find((q) => q.includes('You are the planning agent'))!;
+    expect(planning).toContain(`Source used before: Moon facts — ${url('/moon')}`);
+    expect(planning).toContain('nothing in them has been verified');
   });
 
   it('keeps an agent\'s invented quote and unfetchable source out of the report', async () => {

@@ -86,6 +86,8 @@ export interface VeritasConfig {
   maxSubtasks: number;
   /** Per-agent timeout in milliseconds. */
   agentTimeoutMs: number;
+  /** Remember useful sources and your stated preferences across tasks (stored only on this machine). */
+  memoryEnabled: boolean;
   /** Absolute path of the agent runtime binary; discovered automatically when unset. */
   claudeBinary?: string;
   cli: CLIPreferences;

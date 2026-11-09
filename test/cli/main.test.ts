@@ -9,6 +9,7 @@ import { main } from '../../src/cli/main.js';
 import { OutputFormatter } from '../../src/cli/output.js';
 import { EvidenceStore } from '../../src/evidence/evidence-store.js';
 import { ensureHome, dbPath } from '../../src/storage/paths.js';
+import { MemoryStore } from '../../src/memory/memory-store.js';
 import { Store } from '../../src/storage/store.js';
 
 const FAKE = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'fake-claude.mjs');
@@ -239,5 +240,31 @@ describe('veritas CLI', () => {
     const h = harness();
     expect(await h.run('doctor')).toBe(0);
     expect(h.out()).toContain('Analysis sandbox');
+  });
+
+  it('lists, searches, forgets and clears what is remembered, asking before clearing', async () => {
+    const h = harness();
+    ensureHome(h.home);
+    const store = Store.open(dbPath(h.home));
+    const mem = new MemoryStore(store);
+    mem.add('source', 'Battery prices survey — https://example.org/b', 'https://example.org/b');
+    mem.add('preference', 'Which region? EU', 'p');
+    store.close();
+
+    expect(await h.run('memory')).toBe(0);
+    expect(h.out()).toContain('Memory is on');
+    expect(h.out()).toContain('Battery prices survey');
+    expect(await h.run('memory', 'search', 'battery')).toBe(0);
+    expect(await h.run('memory', 'list', '--kind', 'preference')).toBe(0);
+    const id = h.out().match(/mem_[0-9a-f]{16}/)![0];
+    expect(await h.run('memory', 'forget', id)).toBe(0);
+    expect(await h.run('memory', 'forget', id)).toBe(1);
+    expect(await h.run('memory', 'clear')).toBe(1); // not interactive and no --yes
+    expect(h.err()).toMatch(/pass --yes/);
+    expect(await h.run('memory', 'clear', '--yes')).toBe(0);
+    expect(h.out()).toContain('Erased 1 item');
+    expect(await h.run('config', 'set', 'memoryEnabled', 'false')).toBe(0);
+    expect(await h.run('memory')).toBe(0);
+    expect(h.out()).toContain('Memory is off');
   });
 });

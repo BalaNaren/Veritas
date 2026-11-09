@@ -18,6 +18,7 @@ import { readDocument } from '../documents/readers.js';
 import { EvidenceStore, fileUrl } from '../evidence/evidence-store.js';
 import { chooseSandbox } from '../sandbox/index.js';
 import type { Sandbox } from '../sandbox/types.js';
+import { MemoryStore } from '../memory/memory-store.js';
 import { runSubtasks } from './scheduler.js';
 import { finishResearch } from './research-pipeline.js';
 import { fetchUrl } from '../tools/web-fetch.js';
@@ -176,6 +177,38 @@ export class Engine {
     })());
   }
 
+  private rememberedPreferences(goal: string): string[] {
+    if (!this.config.memoryEnabled) return [];
+    const mem = new MemoryStore(this.store);
+    const found = mem.search(goal, { kind: 'preference', limit: 5 });
+    mem.markUsed(found.map((m) => m.id));
+    return found.map((m) => m.text);
+  }
+
+  /** Remembered preferences and sources that look relevant to this goal. */
+  private memoryHints(goal: string): string[] {
+    if (!this.config.memoryEnabled) return [];
+    const mem = new MemoryStore(this.store);
+    const found = [...mem.search(goal, { kind: 'preference', limit: 4 }), ...mem.search(goal, { kind: 'source', limit: 5 })];
+    mem.markUsed(found.map((m) => m.id));
+    return found.map((m) => (m.kind === 'preference' ? `Preference: ${m.text}` : `Source used before: ${m.text}`));
+  }
+
+  /** After a report is finished, remember the sources that backed its confirmed claims. */
+  private rememberSources(task: TaskRow): void {
+    if (!this.config.memoryEnabled) return;
+    const evidence = new EvidenceStore(this.store, this.config.homeDir);
+    const mem = new MemoryStore(this.store);
+    const topic = task.goal.replace(/\s+/g, ' ').slice(0, 100);
+    const ids = new Set(evidence.listClaims(task.id, 'confirmed').map((c) => c.sourceId).filter((x): x is string => !!x));
+    let added = 0;
+    for (const id of ids) {
+      const s = evidence.getSource(id);
+      if (!s || s.kind !== 'web' || added >= 10) continue;
+      if (mem.add('source', `${s.title ?? s.finalUrl} — ${s.finalUrl} (${s.quality}; used for: ${topic})`, s.finalUrl, task.id)) added++;
+    }
+  }
+
   /** Read the user's files once, store their text, and make them citable. Returns the failed task if one cannot be read. */
   private async prepareFiles(task: TaskRow): Promise<TaskRow | undefined> {
     if (!task.inputs.length) return undefined;
@@ -201,7 +234,8 @@ export class Engine {
     if (done) return task;
     this.store.updateTask(task.id, { status: 'clarifying' });
     this.events.emit(task.id, 'clarify.started');
-    const outcome = await clarifyGoal(task.goal, { provider: this.provider, config: this.config, cwd: task.cwd, signal });
+    const known = this.rememberedPreferences(task.goal);
+    const outcome = await clarifyGoal(task.goal, { provider: this.provider, config: this.config, cwd: task.cwd, signal, known });
     if (outcome.costUsd > 0) this.store.addSpent(task.id, outcome.costUsd);
     if (!outcome.ok) {
       if (signal?.aborted) {
@@ -223,6 +257,11 @@ export class Engine {
       }
     }
     const statements = answersToStatements(questions, answers);
+    if (!usedDefaults && this.config.memoryEnabled) {
+      // Only what the person actually answered is remembered, never a default the model suggested.
+      const mem = new MemoryStore(this.store);
+      for (const q of questions) if (answers[q.id]?.trim()) mem.add('preference', `${q.text} ${answers[q.id]!.trim()} (earlier task: ${task.goal.replace(/\s+/g, ' ').slice(0, 100)})`, `${q.text}|${answers[q.id]!.trim()}`.toLowerCase(), task.id);
+    }
     const merged = [...new Set([...task.assumptions, ...statements, ...assumptions])];
     this.events.emit(task.id, 'clarify.answered', { answers, usedDefaults, questions: questions.length });
     return this.store.updateTask(task.id, { status: 'draft', assumptions: merged });
@@ -243,7 +282,7 @@ export class Engine {
     const outcome = await planGoal(task.goal, {
       provider: this.provider, config: this.config, cwd: task.cwd, signal,
       history: this.store.averageSubtaskCostByModel(), decided: task.assumptions,
-      files: fileSummaries, dataAvailable,
+      files: fileSummaries, dataAvailable, hints: this.memoryHints(task.goal),
     });
     if (outcome.costUsd > 0) this.store.addSpent(task.id, outcome.costUsd);
     if (!outcome.ok) {
@@ -358,6 +397,7 @@ export class Engine {
       return { task: this.store.updateTask(task.id, { status: 'failed', error: outcome.error }) };
     }
     const done = this.store.updateTask(task.id, { status: 'done', resultPath: outcome.resultPath });
+    this.rememberSources(done);
     this.events.emit(task.id, 'task.done', { resultPath: outcome.resultPath, spentUsd: done.spentUsd });
     return { task: done, resultPath: outcome.resultPath };
   }

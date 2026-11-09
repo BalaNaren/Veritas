@@ -6,6 +6,7 @@ import type { AgentRunRequest, AgentRunResult, ModelProvider } from '../../src/a
 import { defaultConfig } from '../../src/config.js';
 import { Engine, type Approver } from '../../src/engine/engine.js';
 import { Policy } from '../../src/policy/policy.js';
+import { MemoryStore } from '../../src/memory/memory-store.js';
 import { Store } from '../../src/storage/store.js';
 
 const homes: string[] = [];
@@ -209,5 +210,53 @@ describe('Engine clarifying', () => {
     expect(store.listEvents(t.id).map((e) => e.type)).toContain('clarify.skipped');
     await engine.execute(t.id, { clarify: { mode: 'ask' } });
     expect(clarifierCalls).toBe(1);
+  });
+});
+
+describe('Engine memory', () => {
+  const asking = (seen: string[]): ModelProvider => ({
+    id: 'claude-code',
+    async run(r) {
+      seen.push(r.prompt);
+      if (r.jsonSchema && JSON.stringify(r.jsonSchema).includes('"questions"')) {
+        return ok({ json: { questions: [{ id: 'q1', text: 'Which region?', options: ['EU', 'US'], default: 'US' }], assumptions: [] } });
+      }
+      return fakeProvider().run(r);
+    },
+  });
+  const run = async (engine: Engine, goal: string, answers: Record<string, string> | null) => {
+    const t = engine.createTask(goal);
+    return engine.execute(t.id, { approver: yes, clarify: { mode: 'ask', ask: async () => answers } });
+  };
+
+  it('remembers what the person answered, but never a default, and uses it for the next similar task', async () => {
+    const seen: string[] = [];
+    const { engine, store } = setup(asking(seen));
+    await run(engine, 'Report on battery prices', { q1: 'EU' });
+    await run(engine, 'Report on solar panel installers', null); // defaults only: nothing new to remember
+    const mem = new MemoryStore(store);
+    expect(mem.list().map((m) => m.text)).toEqual(['Which region? EU (earlier task: Report on battery prices)']);
+
+    seen.length = 0;
+    await run(engine, 'Another report on battery prices', { q1: 'EU' });
+    const planner = seen.find((p) => p.includes('You are the planning agent'))!;
+    expect(planner).toContain('Remembered from earlier tasks');
+    expect(planner).toContain('Preference: Which region? EU (earlier task: Report on battery prices)');
+    expect(planner).toContain('not facts');
+    const clarifier = seen.find((p) => p.includes('help a person get exactly what they want'))!;
+    expect(clarifier).toContain('Do not ask about anything they already answer');
+    expect(mem.list()[0]!.uses).toBeGreaterThan(0);
+  });
+
+  it('remembers and uses nothing when memory is switched off', async () => {
+    const seen: string[] = [];
+    const home = mkdtempSync(join(tmpdir(), 'veritas-eng-'));
+    homes.push(home);
+    const store = Store.open(':memory:');
+    new MemoryStore(store).add('preference', 'Which region? EU', 'k');
+    const engine = new Engine({ store, provider: asking(seen), config: { ...defaultConfig(home), memoryEnabled: false }, retryDelayMs: 0 });
+    await run(engine, 'Report on battery prices', { q1: 'US' });
+    expect(new MemoryStore(store).count()).toBe(1);
+    expect(seen.some((p) => p.includes('Remembered from earlier tasks'))).toBe(false);
   });
 });

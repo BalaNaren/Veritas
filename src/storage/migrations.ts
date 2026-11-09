@@ -146,4 +146,21 @@ export const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX idx_runs_task ON runs(task_id);
   `,
+  // 6: memory (sources and preferences remembered across tasks), searchable with full-text search
+  `
+  CREATE TABLE memory (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    key TEXT NOT NULL,
+    task_id TEXT,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT,
+    uses INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (kind, key)
+  );
+  CREATE VIRTUAL TABLE memory_fts USING fts5(text, content='memory', content_rowid='rowid', tokenize='porter unicode61');
+  CREATE TRIGGER memory_ai AFTER INSERT ON memory BEGIN INSERT INTO memory_fts(rowid, text) VALUES (new.rowid, new.text); END;
+  CREATE TRIGGER memory_ad AFTER DELETE ON memory BEGIN INSERT INTO memory_fts(memory_fts, rowid, text) VALUES ('delete', old.rowid, old.text); END;
+  `,
 ];
