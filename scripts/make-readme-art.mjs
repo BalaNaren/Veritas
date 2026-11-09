@@ -2,17 +2,47 @@
 // Generates the README graphics in docs/assets. The console recording is drawn by the real live-view code from the
 // event timeline of a real run (docs/assets/recording-data.json). Run with: npm run art
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { buildFrame } from '../dist/cli/live.js';
 import { OutputFormatter } from '../dist/cli/output.js';
 
 const root = new URL('..', import.meta.url).pathname;
-const out = (name, svg) => { writeFileSync(join(root, 'docs/assets', name), svg); console.log(`wrote docs/assets/${name} (${(svg.length / 1024).toFixed(0)} KB)`); };
+const requireDep = createRequire(import.meta.url);
+
+// Text width. Viewers pick their own fonts (GitHub on Windows or Linux has no Helvetica Neue), and a wider font would run
+// out of its box. Every line therefore gets an explicit width measured with real Helvetica metrics; a viewer with another
+// font squeezes or stretches the line to that width instead of overflowing. (pdfkit ships the Helvetica metrics.)
+const PDFDocument = requireDep('pdfkit');
+const measurer = new PDFDocument({ autoFirstPage: false });
+measurer.addPage();
+const unesc = (t) => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+function sansWidth(text, size, bold, spacing) {
+  measurer.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(size);
+  let w = 0;
+  for (const ch of text) { try { w += measurer.widthOfString(ch); } catch { w += size * 0.6; } }
+  return w || text.length * size * 0.55 + spacing * text.length;
+}
+function fitText(svg) {
+  return svg.replace(/<text([^>]*)>([^<]+)<\/text>/g, (m, attrs, inner) => {
+    if (/textLength=/.test(attrs) || /font-family="[^"]*Menlo/.test(attrs)) return m;
+    const size = Number((attrs.match(/font-size="([\d.]+)"/) ?? [])[1]);
+    if (!size) return m;
+    const text = unesc(inner);
+    if ([...text].length < 3) return m;
+    const bold = /font-weight="(7|8|9)00"/.test(attrs) || /font-weight="bold"/.test(attrs);
+    const spacing = Number((attrs.match(/letter-spacing="(-?[\d.]+)"/) ?? [0, 0])[1]);
+    // Measured glyph widths plus the letter spacing between glyphs (not after the last one).
+    const len = measurer.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(size) && ([...text].reduce((a, ch) => { try { return a + measurer.widthOfString(ch); } catch { return a + size * 0.6; } }, 0) + spacing * ([...text].length - 1));
+    return `<text${attrs} textLength="${len.toFixed(1)}" lengthAdjust="spacingAndGlyphs">${inner}</text>`;
+  });
+}
+const out = (name, svg) => { svg = fitText(svg); writeFileSync(join(root, 'docs/assets', name), svg); console.log(`wrote docs/assets/${name} (${(svg.length / 1024).toFixed(0)} KB)`); };
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // Colours carry meaning: green = confirmed, amber = flagged, coral = removed.
 const C = { bg: '#0a1020', bg2: '#0e1830', panel: '#111c33', line: '#1d2e4d', text: '#e8eef8', muted: '#8ea3bd', gray: '#5b6676', teal: '#35f2c0', cyan: '#36d6ff', amber: '#ffc94a', coral: '#ff5d73', violet: '#8b7bff' };
-const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+const SANS = "'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', 'Segoe UI', Roboto, sans-serif";
 const MONO = "'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace";
 
 const glow = (id, std = 5) => `<filter id="${id}" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="${std}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
@@ -63,12 +93,19 @@ function banner() {
 }
 
 // ---------------------------------------------------------------- capability cards
-function card(x, y, title, lines, icon, accent, label) {
+/** A rounded rectangle as a path, so its length can be normalised with pathLength (which works on paths in every browser). */
+const roundedRectPath = (x, y, w, h, r) => `M${x + r} ${y} H${x + w - r} A${r} ${r} 0 0 1 ${x + w} ${y + r} V${y + h - r} A${r} ${r} 0 0 1 ${x + w - r} ${y + h} H${x + r} A${r} ${r} 0 0 1 ${x} ${y + h - r} V${y + r} A${r} ${r} 0 0 1 ${x + r} ${y} Z`;
+
+function card(x, y, title, lines, icon, accent, label, index = 0) {
+  const border = roundedRectPath(6, 6, 592, 238, 19);
+  // A light that runs once around the border. The path length is set to 100, so a dash that slides by exactly 100 goes
+  // all the way round and joins up with itself: no jump at the seam.
+  const run = (width, opacity) => `<path d="${border}" pathLength="100" fill="none" stroke="#ffffff" stroke-width="${width}" stroke-opacity="${opacity}" stroke-linecap="round" stroke-dasharray="9 91" stroke-dashoffset="${process.env.ART_DASH ?? 0}">${process.env.ART_DASH !== undefined ? '' : `<animate attributeName="stroke-dashoffset" from="0" to="-100" dur="8s" begin="${(index * 1.7).toFixed(1)}s" repeatCount="indefinite"/>`}</path>`;
   return `<g transform="translate(${x} ${y})">
 <rect width="604" height="250" rx="24" fill="#0c1426" stroke="${C.line}" stroke-width="2"/>
 <rect x="6" y="6" width="592" height="238" rx="19" fill="none" stroke="${accent}" stroke-width="3" opacity=".9" filter="url(#g)"/>
 <rect x="6" y="6" width="592" height="238" rx="19" fill="none" stroke="#ffffff" stroke-opacity=".25" stroke-width="1"/>
-<rect x="6" y="6" width="150" height="238" rx="19" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="90 1000" opacity=".8"><animate attributeName="stroke-dashoffset" values="0;-1900" dur="9s" repeatCount="indefinite"/></rect>
+${run(9, 0.16)}${run(3, 0.95)}
 <g transform="translate(96 100)"><circle r="62" fill="#101d36"/>${icon}</g>
 <text x="190" y="72" font-family="${SANS}" font-size="15" letter-spacing="5" fill="${accent}">${label}</text>
 <text x="190" y="116" font-family="${SANS}" font-weight="700" font-size="36" fill="${C.text}">${title}</text>
@@ -83,10 +120,10 @@ function capabilities() {
   const safe = `<g ${stroke(C.violet)}><rect x="-26" y="-6" width="52" height="40" rx="8"/><path d="M-14 -6 V-18 A14 14 0 0 1 14 -18 V-6"/><circle cx="0" cy="14" r="4"/></g>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 540" width="1280" height="540" role="img" aria-label="What Veritas does">
 <defs>${glow('g', 3)}${grid('grid')}</defs><rect width="1280" height="540" rx="18" fill="${C.bg}"/><rect width="1280" height="540" rx="18" fill="url(#grid)" opacity=".45"/>
-${card(24, 10, 'Verified claims', ['Every fact is tied to a source and an exact quote.', 'An independent checker reads it. What fails is removed.'], verified, C.teal, 'VERITAS / TRUST')}
-${card(652, 10, 'Parallel agents', ['A planner splits the goal. Agents work at the same time.', 'You approve the plan and the cost first.'], parallel, C.cyan, 'VERITAS / SPEED')}
-${card(24, 280, 'Your files and data', ['PDF, Word, Excel, CSV: cited to the exact page.', 'Numbers come only from code that really ran.'], files, C.amber, 'VERITAS / YOUR WORK')}
-${card(652, 280, 'Safe by default', ['Code changes happen in a separate copy of your repo.', 'Commit, merge and push always ask you first.'], safe, C.violet, 'VERITAS / CONTROL')}
+${card(24, 10, 'Verified claims', ['Every fact is tied to a source and an exact quote.', 'An independent checker reads it. What fails is removed.'], verified, C.teal, 'VERITAS / TRUST', 0)}
+${card(652, 10, 'Parallel agents', ['A planner splits the goal. Agents work at the same time.', 'You approve the plan and the cost first.'], parallel, C.cyan, 'VERITAS / SPEED', 1)}
+${card(24, 280, 'Your files and data', ['PDF, Word, Excel, CSV: cited to the exact page.', 'Numbers come only from code that really ran.'], files, C.amber, 'VERITAS / YOUR WORK', 2)}
+${card(652, 280, 'Safe by default', ['Code changes happen in a separate copy of your repo.', 'Commit, merge and push always ask you first.'], safe, C.violet, 'VERITAS / CONTROL', 3)}
 </svg>`;
 }
 
@@ -134,6 +171,10 @@ function ansiToTspans(line) {
   return parts.join('');
 }
 
+/** Fixed-width text: the same line takes the same width in any monospace font. */
+const MONO_ADVANCE = 14.5 * 0.602;
+const monoLen = (ansiLine) => { const n = [...ansiLine.replace(/\x1b\[[0-9;]*m/g, '')].length; return n > 2 ? ` textLength="${(n * MONO_ADVANCE).toFixed(1)}" lengthAdjust="spacingAndGlyphs"` : ''; };
+
 /** Draws a terminal recording from frames of the real live view. */
 function recording(spec) {
   const fmt = new OutputFormatter({ color: true });
@@ -154,7 +195,7 @@ function recording(spec) {
     const end = i + 1 < frames.length ? frames[i + 1].start : LOOP;
     const isLast = i === frames.length - 1;
     const kt = [0, f.start / LOOP, end / LOOP, 1].map((k) => Math.min(1, Math.max(0, +k.toFixed(5))));
-    const body = f.lines.map((l, k) => `<text x="${X}" y="${Y0 + k * LH}" xml:space="preserve">${ansiToTspans(l)}</text>`).join('');
+    const body = f.lines.map((l, k) => `<text x="${X}" y="${Y0 + k * LH}" xml:space="preserve"${monoLen(l)}>${ansiToTspans(l)}</text>`).join('');
     const tail = isLast ? final.map((l, k) => `<text x="${X}" y="${Y0 + (f.lines.length + 1 + k) * LH}" xml:space="preserve"><tspan fill="${k === 0 ? C.teal : C.muted}">${esc(l)}</tspan></text>`).join('') : '';
     if (only >= 0) return i === only ? `<g>${body}${tail}</g>` : '';
     return `<g opacity="0"><animate attributeName="opacity" calcMode="discrete" keyTimes="${kt.join(';')}" values="${isLast ? '0;1;1;1' : '0;1;0;0'}" dur="${LOOP}s" repeatCount="indefinite"/>${body}${tail}</g>`;
