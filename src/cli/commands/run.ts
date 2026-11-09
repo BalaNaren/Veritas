@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
+import { CommandError } from '../../coding/command.js';
+import { RepoError } from '../../coding/repo.js';
 import { EXTENSIONS } from '../../documents/types.js';
 import { formatUsd } from '../../cost/estimate.js';
 import type { ClarifyQuestion } from '../../clarify/clarifier.js';
@@ -42,6 +44,29 @@ function makeApprover(app: App): Approver {
       const d = approval.detail as { spentUsd: number; limitUsd: number; newLimitUsd: number };
       out.writeln(out.warning(`Spent ${formatUsd(d.spentUsd)} of the ${formatUsd(d.limitUsd)} budget and there is more to do.`));
       return askChoice(app, `Raise the budget to ${formatUsd(d.newLimitUsd)} and continue?`);
+    }
+    if (approval.action === 'cmd.first_run') {
+      const d = approval.detail as { command: string; purpose: string; repo: string };
+      out.writeln(out.warning(`Veritas wants to run \`${d.command}\` (${d.purpose === 'setup' ? 'to set the project up' : 'to run the project\'s tests'}) in a separate copy of ${d.repo}.`));
+      out.writeln('That runs the project\'s own code on your computer, like running it yourself. It is asked once per project and command.');
+      return askChoice(app, 'Allow it?');
+    }
+    if (approval.action === 'git.commit') {
+      const d = approval.detail as { branch: string; files: string[]; stat: string; tests: string };
+      out.writeln(out.bold(`Save these changes as a commit on the new branch ${d.branch}?`));
+      out.writeln(d.stat);
+      out.writeln(d.tests);
+      return askChoice(app, 'Commit?');
+    }
+    if (approval.action === 'git.merge') {
+      const d = approval.detail as { branch: string; into: string; repo: string };
+      out.writeln(out.bold(`Merge ${d.branch} into ${d.into} in ${d.repo}? This changes your working folder.`));
+      return askChoice(app, 'Merge?');
+    }
+    if (approval.action === 'git.push') {
+      const d = approval.detail as { branch: string; remote: string };
+      out.writeln(out.bold(`Send ${d.branch} to the remote "${d.remote}" and open a pull request? This leaves your computer.`));
+      return askChoice(app, 'Push?');
     }
     out.writeln(`Approval needed: ${approval.action}`);
     return askChoice(app, 'Allow this?');
@@ -191,6 +216,79 @@ export function runCommands(app: App): Command[] {
       },
     },
     {
+      name: 'code',
+      description: 'Make a change to a git repository in a separate copy, run its tests, and show you the result',
+      options: [
+        { name: 'repo', type: 'string', description: 'The repository (default: the current folder)' },
+        { name: 'test-cmd', type: 'string', description: 'Command that runs the tests, for example "npm test" (default: detected)' },
+        { name: 'setup-cmd', type: 'string', description: 'Command to run once first, for example "npm ci"' },
+        { name: 'budget', type: 'number', description: 'Spending limit in US dollars' },
+        { name: 'yes-plan', type: 'boolean', description: 'Approve the plan without asking (commits, merges and pushes always ask)' },
+        { name: 'quick', type: 'boolean', description: 'Skip the clarifying questions' },
+      ],
+      examples: [{ command: 'veritas code "Fix the failing add() test" --repo ~/projects/demo', description: 'Work in a copy; nothing in the project changes until you run `veritas apply`' }],
+      action: async (ctx) => {
+        let task;
+        try {
+          task = await app.engine().createCodingTask(goalFrom(ctx), {
+            repo: resolve(app.rt.cwd, typeof ctx.flags.repo === 'string' ? ctx.flags.repo : '.'), budgetUsd: budgetFrom(ctx), cwd: app.rt.cwd,
+            testCommand: typeof ctx.flags.testCmd === 'string' ? ctx.flags.testCmd : undefined, setupCommand: typeof ctx.flags.setupCmd === 'string' ? ctx.flags.setupCmd : undefined,
+          });
+        } catch (e) {
+          if (e instanceof RepoError || e instanceof CommandError) throw new ValidationError(e.message);
+          throw e;
+        }
+        app.rt.out.writeln(app.rt.out.dim(`Task ${task.id}`));
+        if (task.coding!.testCommand) app.rt.out.writeln(app.rt.out.dim(`Tests: ${task.coding!.testCommand}`)); else app.rt.out.writeln(app.rt.out.warning('No test command was found, so no tests will be run. Use --test-cmd to name one.'));
+        return exit(await drive(app, task.id, { yesPlan: ctx.flags.yesPlan === true, interactive: interactive(ctx), clarify: clarifyMode(ctx, interactive(ctx)) }));
+      },
+    },
+    {
+      name: 'apply',
+      description: 'Keep a coding task\'s change: save it as a commit, and with --merge or --pr also merge it or open a pull request (each asks first)',
+      options: [
+        { name: 'merge', type: 'boolean', description: 'Also merge into the branch you started from' },
+        { name: 'pr', type: 'boolean', description: 'Also push the branch and open a pull request (needs the gh tool)' },
+        { name: 'remote', type: 'string', description: 'Remote to push to (default origin)' },
+      ],
+      action: async (ctx) => {
+        const task = requireTask(app, ctx.args[0]);
+        const approver = interactive(ctx) ? makeApprover(app) : undefined;
+        const r = await app.engine().apply(task.id, { merge: ctx.flags.merge === true, pr: ctx.flags.pr === true, remote: typeof ctx.flags.remote === 'string' ? ctx.flags.remote : undefined }, approver);
+        const out = app.rt.out;
+        if (r.state === 'applied') { for (const n of r.notes) out.writeln(n); return exit(0); }
+        if (r.state === 'nothing') { out.writeln(r.reason); return exit(0); }
+        if (r.state === 'defer') {
+          out.writeln(r.reason);
+          out.writeln(`To approve: veritas approve ${task.id}, then run this command again. (Or run it in a terminal to be asked now.)`);
+          return exit(3);
+        }
+        if (r.state === 'denied') { out.writeln(r.reason); return exit(3); }
+        out.writeErrorln(out.error(r.reason));
+        return exit(1);
+      },
+    },
+    {
+      name: 'discard',
+      description: 'Throw away a coding task\'s separate copy (the branch is kept if it holds a saved commit)',
+      options: [
+        { name: 'yes', type: 'boolean', description: 'Do not ask for confirmation' },
+        { name: 'force', type: 'boolean', description: 'Also delete the branch even if it holds a saved commit' },
+      ],
+      action: async (ctx) => {
+        const task = requireTask(app, ctx.args[0]);
+        if (!task.coding?.worktree) { app.rt.out.writeln('There is no separate copy to discard.'); return exit(0); }
+        if (ctx.flags.yes !== true) {
+          if (!interactive(ctx)) throw new ValidationError('Run this in a terminal, or pass --yes to confirm.');
+          const a = (await app.rt.ask('Throw away the separate copy and its unsaved changes? [y/N] ')).trim().toLowerCase();
+          if (a !== 'y' && a !== 'yes') { app.rt.out.writeln('Nothing was removed.'); return exit(0); }
+        }
+        const r = await app.engine().discard(task.id, ctx.flags.force === true);
+        app.rt.out.writeln(r.keptBranch ? `Removed the copy. The branch ${r.keptBranch} was kept because it holds a saved commit.` : 'Removed the copy and its branch.');
+        return exit(0);
+      },
+    },
+    {
       name: 'plan',
       description: 'Plan a goal and show the plan and cost estimate without running anything',
       options: [
@@ -218,7 +316,11 @@ export function runCommands(app: App): Command[] {
           engine.decide(a.id, deny ? 'denied' : 'approved');
           app.rt.out.writeln(`${deny ? 'Refused' : 'Approved'}: ${a.action}`);
         }
-        if (deny) { engine.cancel(task.id); return exit(0); }
+        if (deny) { if (task.status !== 'done') engine.cancel(task.id); return exit(0); }
+        if (task.status === 'done' && task.coding) {
+          app.rt.out.writeln(`Now run: veritas apply ${task.id}${pending.some((a) => a.action === 'git.merge') ? ' --merge' : ''}${pending.some((a) => a.action === 'git.push') ? ' --pr' : ''}`);
+          return exit(0);
+        }
         return exit(await drive(app, task.id, { interactive: interactive(ctx) }));
       },
     },

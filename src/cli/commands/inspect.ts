@@ -6,6 +6,7 @@ import { describeEvent } from '../progress.js';
 import { formatPlan, subtaskTable, taskTable, truncate } from '../format.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { TestRunStore } from '../../coding/test-runs.js';
 import { taskDir } from '../../storage/paths.js';
 import { writeFileAtomic } from '../../shared/fs.js';
 import { EXPORT_FORMATS, exportReport, type ExportFormat } from '../../write/export.js';
@@ -102,6 +103,17 @@ export function inspectCommands(app: App): Command[] {
         if (task.error) out.writeln(out.error(`Error: ${task.error}`));
         if (task.plan) { out.writeln(); out.writeln(formatPlan(out, task)); }
         if (subtasks.length) { out.writeln(); out.writeln(subtaskTable(out, subtasks)); }
+        if (task.coding) {
+          out.writeln(`\nRepository: ${task.coding.repo} (from ${task.coding.baseBranch})`);
+          if (task.coding.branch) out.writeln(`Branch: ${task.coding.branch}${task.coding.worktree ? `, separate copy at ${task.coding.worktree}` : ' (copy removed)'}`);
+          const runs = new TestRunStore(app.store).list(task.id);
+          if (runs.length) {
+            out.writeln(out.table({
+              columns: [{ key: 'phase', header: 'When', width: 10 }, { key: 'command', header: 'Command', width: 24 }, { key: 'result', header: 'Result', width: 24 }, { key: 'time', header: 'Time', width: 8, align: 'right' }],
+              data: runs.map((r) => ({ phase: r.phase, command: r.command, result: r.timedOut ? 'ran too long' : r.exitCode === null ? 'could not run' : r.passed ? 'passed' : `failed (exit ${r.exitCode})`, time: `${(r.durationMs / 1000).toFixed(1)} s` })),
+            }));
+          }
+        }
         const pending = approvals.filter((a) => a.status === 'pending');
         for (const a of pending) out.writeln(out.warning(`Waiting for approval: ${a.action} (veritas approve ${task.id})`));
         if (task.resultPath) out.writeln(`Result: ${task.resultPath}`);

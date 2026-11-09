@@ -18,7 +18,10 @@ import { readDocument } from '../documents/readers.js';
 import { EvidenceStore, fileUrl } from '../evidence/evidence-store.js';
 import { chooseSandbox } from '../sandbox/index.js';
 import type { Sandbox } from '../sandbox/types.js';
+import { CodingSupport, type ApplyOptions, type ApplyResult } from '../coding/support.js';
+import { RepoError } from '../coding/repo.js';
 import { MemoryStore } from '../memory/memory-store.js';
+import { estimatePlanCost } from '../cost/estimate.js';
 import { runSubtasks } from './scheduler.js';
 import { finishResearch } from './research-pipeline.js';
 import { fetchUrl } from '../tools/web-fetch.js';
@@ -91,6 +94,7 @@ export class Engine {
   private readonly checker?: Checker;
   private readonly sandboxOption?: Sandbox | (() => Promise<Sandbox | undefined>);
   private sandboxCache?: Promise<Sandbox | undefined>;
+  private readonly coding: CodingSupport;
 
   constructor(opts: EngineOptions) {
     this.store = opts.store;
@@ -102,6 +106,7 @@ export class Engine {
     this.fetcher = opts.fetcher ?? fetchUrl;
     this.checker = opts.checker;
     this.sandboxOption = opts.sandbox;
+    this.coding = new CodingSupport({ store: this.store, events: this.events, homeDir: this.config.homeDir });
   }
 
   createTask(goal: string, opts: NewTaskOptions = {}): TaskRow {
@@ -113,6 +118,40 @@ export class Engine {
     });
     this.events.emit(task.id, 'task.created', { goal: text, budgetUsd: task.budgetUsd });
     return task;
+  }
+
+  /**
+   * Start a coding task on a git repository. Nothing in the repository is changed: the work happens in a separate
+   * working copy made when the task runs. Throws `RepoError` or `CommandError` with a plain explanation.
+   */
+  async createCodingTask(goal: string, opts: NewTaskOptions & { repo: string; testCommand?: string; setupCommand?: string }): Promise<TaskRow> {
+    const text = goal.trim();
+    if (!text) throw new Error('The goal is empty.');
+    const { info, dirty } = await this.coding.inspect(opts.repo, { testCommand: opts.testCommand, setupCommand: opts.setupCommand });
+    const task = this.store.createTask({
+      slug: slugify(text), goal: text, type: 'coding', mode: this.provider.id, budgetUsd: opts.budgetUsd ?? this.config.defaultBudgetUsd,
+      cwd: opts.cwd ?? process.cwd(), coding: info,
+    });
+    if (dirty.length) this.store.updateTask(task.id, { assumptions: [`The work starts from the last commit on "${info.baseBranch}". Your ${dirty.length} uncommitted change(s) are not included.`] });
+    this.events.emit(task.id, 'task.created', { goal: text, budgetUsd: task.budgetUsd, repo: info.repo, testCommand: info.testCommand });
+    return this.require(task.id);
+  }
+
+  /** Save a finished coding task's work as a commit and, if asked, merge it or open a pull request. Each step asks first. */
+  async apply(taskId: string, o: ApplyOptions, approver?: Approver): Promise<ApplyResult> {
+    const task = this.require(taskId);
+    if (!task.coding) return { state: 'blocked', reason: 'This is not a coding task.' };
+    if (task.status !== 'done') return { state: 'blocked', reason: `This task is not finished yet (status: ${task.status}).` };
+    return this.coding.apply(task, o, (action, detail) => this.gateOnce(task, action, detail, { approver }));
+  }
+
+  /** Throw away a coding task's working copy. The branch is kept if it holds a saved commit, unless `force`. */
+  async discard(taskId: string, force = false): Promise<{ keptBranch: string | null }> {
+    const task = this.require(taskId);
+    if (!task.coding?.worktree) return { keptBranch: null };
+    const saved = await this.coding.hasSavedWork(task);
+    await this.coding.discard(task, force || !saved);
+    return { keptBranch: !force && saved ? task.coding.branch : null };
   }
 
   /** Record a decision made by the person. This is the only way an approval is decided; agents have no path to it. */
@@ -138,6 +177,7 @@ export class Engine {
     if (TERMINAL_TASK_STATUSES.includes(task.status)) return { task };
     const { signal } = opts;
 
+    // A coding task's plan is always one step, so no planner is needed.
     const needsPlan = task.status === 'draft' || task.status === 'clarifying'
       || (task.status === 'paused' && this.store.listSubtasks(task.id).length === 0);
     if (needsPlan) {
@@ -164,6 +204,13 @@ export class Engine {
       if (gate === 'defer') return { task: this.store.updateTask(task.id, { status: 'awaiting_approval' }) };
     }
 
+    const ready = this.require(task.id);
+    if (ready.coding) {
+      const prep = await this.coding.prepare(ready, (action, detail) => this.gateOnce(ready, action, detail, opts), signal);
+      if (prep.state === 'denied') { this.events.emit(ready.id, 'task.cancelled', { reason: 'command not approved' }); return { task: this.store.updateTask(ready.id, { status: 'cancelled' }) }; }
+      if (prep.state === 'defer') return { task: this.store.updateTask(ready.id, { status: 'awaiting_approval' }) };
+      if (prep.state === 'failed') return { task: prep.task };
+    }
     return this.run(this.require(task.id), opts);
   }
 
@@ -267,7 +314,22 @@ export class Engine {
     return this.store.updateTask(task.id, { status: 'draft', assumptions: merged });
   }
 
+  /** The plan for a coding task: one step. */
+  private planCoding(task: TaskRow): TaskRow {
+    const subtasks = [{ key: 't1', title: 'Make the change', kind: 'code', instructions: task.goal, dependsOn: [] as string[] }];
+    const est = estimatePlanCost(subtasks, this.config.models, this.store.averageSubtaskCostByModel());
+    const plan = { subtasks, assumptions: task.assumptions, estimateUsd: { low: est.low, high: est.high * 2 }, estimateBasis: est.basis };
+    this.store.transaction(() => {
+      this.store.deleteSubtasks(task.id);
+      this.store.createSubtasks(task.id, subtasks);
+      this.store.updateTask(task.id, { status: 'planned', plan });
+    });
+    this.events.emit(task.id, 'plan.created', { tasks: 1, estimateUsd: plan.estimateUsd, estimateBasis: plan.estimateBasis, costUsd: 0 });
+    return this.require(task.id);
+  }
+
   private async plan(task: TaskRow, signal?: AbortSignal): Promise<TaskRow> {
+    if (task.coding) return this.planCoding(task);
     this.events.emit(task.id, 'plan.started');
     const fileSummaries = new EvidenceStore(this.store, this.config.homeDir).listSources(task.id).filter((s) => s.kind === 'file')
       .map((s) => ({ name: s.title ?? s.url, kind: s.contentType ?? 'file', units: s.units?.length ?? 0 }));
@@ -335,6 +397,31 @@ export class Engine {
     return answer;
   }
 
+  /**
+   * Like `gate`, but each approval is good for one use only. A person's earlier "yes" given through `veritas approve`
+   * is used once; a new action needs a new approval. Used for commands, commits, merges and pushes.
+   */
+  private async gateOnce(task: TaskRow, action: string, detail: unknown, opts: { approver?: Approver }): Promise<Decision> {
+    const verdict = this.policy.evaluate(action);
+    if (verdict.decision === 'allow') return 'approved';
+    if (verdict.decision === 'deny') { this.events.emit(task.id, 'policy.denied', { action, reason: verdict.reason }); return 'denied'; }
+    const all = this.store.listApprovals(task.id).filter((a) => a.action === action);
+    const used = new Set(this.store.listEvents(task.id).filter((e) => e.type === 'approval.used').map((e) => (e.data as { id: string }).id));
+    const spare = all.find((a) => a.status === 'approved' && !used.has(a.id));
+    if (spare) { this.events.emit(task.id, 'approval.used', { id: spare.id, action }); return 'approved'; }
+    let approval = all.find((a) => a.status === 'pending');
+    if (!approval) {
+      approval = this.store.createApproval(task.id, action, detail);
+      this.events.emit(task.id, 'approval.requested', { action, id: approval.id, detail });
+    }
+    if (!opts.approver) return 'defer';
+    const answer = await opts.approver({ approval, task });
+    if (answer === 'defer') return 'defer';
+    this.decide(approval.id, answer);
+    if (answer === 'approved') this.events.emit(task.id, 'approval.used', { id: approval.id, action });
+    return answer;
+  }
+
   private async run(task: TaskRow, opts: ExecuteOptions): Promise<ExecuteResult> {
     const { signal } = opts;
     // A raise of the limit the person approved earlier takes effect now.
@@ -354,6 +441,7 @@ export class Engine {
         store: this.store, events: this.events, provider: this.provider, budget, config: this.config,
         task: fresh, signal, retryDelayMs: this.retryDelayMs,
         sandbox: this.store.listSubtasks(task.id).some((s) => s.kind === 'data') ? await this.getSandbox() : undefined,
+        coding: fresh.coding?.worktree ? this.coding.services(fresh) : undefined,
       });
 
       if (outcome.status === 'cancelled') {
@@ -379,8 +467,24 @@ export class Engine {
         return { task: this.store.updateTask(task.id, { status: 'paused' }) };
       }
       const finished = this.require(task.id);
+      if (finished.type === 'coding') return this.finishCodingTask(finished);
       if (EVIDENCE_TASK_TYPES.includes(finished.type)) return this.finishResearchTask(finished, signal);
       return this.finish(finished);
+    }
+  }
+
+  private async finishCodingTask(task: TaskRow): Promise<ExecuteResult> {
+    try {
+      const sub = this.store.listSubtasks(task.id).find((s) => s.kind === 'code' && s.status === 'done');
+      const out = (sub?.output ?? { summary: '', notes: '' }) as { summary: string; notes: string };
+      const resultPath = await this.coding.finish(task, out);
+      const done = this.store.updateTask(task.id, { status: 'done', resultPath });
+      this.events.emit(task.id, 'task.done', { resultPath, spentUsd: done.spentUsd });
+      return { task: done, resultPath };
+    } catch (e) {
+      const error = e instanceof RepoError || e instanceof Error ? e.message : String(e);
+      this.events.emit(task.id, 'task.failed', { error });
+      return { task: this.store.updateTask(task.id, { status: 'failed', error }) };
     }
   }
 

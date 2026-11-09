@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,7 @@ import { OutputFormatter } from '../../src/cli/output.js';
 import { EvidenceStore } from '../../src/evidence/evidence-store.js';
 import { ensureHome, dbPath } from '../../src/storage/paths.js';
 import { MemoryStore } from '../../src/memory/memory-store.js';
+import { BUGGY_PROJECT, makeRepo, sh } from '../coding/helpers.js';
 import { Store } from '../../src/storage/store.js';
 
 const FAKE = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'fake-claude.mjs');
@@ -266,5 +267,67 @@ describe('veritas CLI', () => {
     expect(await h.run('config', 'set', 'memoryEnabled', 'false')).toBe(0);
     expect(await h.run('memory')).toBe(0);
     expect(h.out()).toContain('Memory is off');
+  });
+
+  describe('coding commands', () => {
+    const GOAL_FIX = 'Fix add [[fake:edit:add.js=export function add(a, b) { return a + b; }]]';
+
+    it('works in a separate copy, shows the recorded test results, and leaves the repository alone', async () => {
+      const repo = makeRepo(BUGGY_PROJECT);
+      const before = { head: sh(repo, 'rev-parse', 'HEAD'), status: sh(repo, 'status', '--porcelain') };
+      const h = harness();
+      expect(await h.run('code', GOAL_FIX, '--repo', repo, '--test-cmd', 'node --test', '--yes-plan', '--quick')).toBe(0);
+      expect(h.out()).toContain('Working in a separate copy on branch veritas/');
+      expect(h.out()).toContain('Tests before any change: failing');
+      expect(h.out()).toContain('The tests passed after the change');
+      expect(h.out()).toContain('Nothing has been committed, merged or pushed');
+      expect({ head: sh(repo, 'rev-parse', 'HEAD'), status: sh(repo, 'status', '--porcelain') }).toEqual(before);
+      const id = idOf(h.out());
+      expect(await h.run('show', id)).toBe(0);
+      expect(h.out()).toContain('Branch: veritas/');
+      expect(h.out()).toContain('passed');
+    });
+
+    it('applies only with approval: deferred when unattended, committed after `approve`, merged only when asked and approved', async () => {
+      const repo = makeRepo(BUGGY_PROJECT);
+      const h = harness();
+      await h.run('code', GOAL_FIX, '--repo', repo, '--test-cmd', 'node --test', '--yes-plan', '--quick');
+      const id = idOf(h.out());
+      expect(await h.run('apply', id)).toBe(3);
+      expect(h.out()).toContain(`veritas approve ${id}`);
+      expect(sh(repo, 'branch', '--format=%(refname:short)')).not.toContain('veritas/x');
+      expect(await h.run('approve', id)).toBe(0);
+      expect(h.out()).toContain(`Now run: veritas apply ${id}`);
+      expect(await h.run('apply', id)).toBe(0);
+      expect(h.out()).toMatch(/Saved as commit [0-9a-f]{10} on branch veritas\//);
+      expect(sh(repo, 'rev-parse', 'main')).toBe(sh(repo, 'log', '-1', '--format=%H', 'main'));
+      expect(readFileSync(join(repo, 'add.js'), 'utf8')).toContain('a - b');          // still not merged
+
+      const merge = harness({ interactive: true, answers: ['y'], home: h.home });
+      expect(await merge.run('apply', id, '--merge')).toBe(0);
+      expect(merge.out()).toContain('Merge veritas/');
+      expect(readFileSync(join(repo, 'add.js'), 'utf8')).toContain('a + b');
+    });
+
+    it('asks before discarding and refuses to guess when unattended', async () => {
+      const repo = makeRepo(BUGGY_PROJECT);
+      const h = harness();
+      await h.run('code', GOAL_FIX, '--repo', repo, '--test-cmd', 'node --test', '--yes-plan', '--quick');
+      const id = idOf(h.out());
+      expect(await h.run('discard', id)).toBe(1);
+      expect(h.err()).toMatch(/pass --yes/);
+      expect(await h.run('discard', id, '--yes')).toBe(0);
+      expect(h.out()).toContain('Removed the copy and its branch');
+      expect(sh(repo, 'worktree', 'list').split('\n')).toHaveLength(1);
+    });
+
+    it('explains a folder that is not a repository, and a command that needs a shell', async () => {
+      const h = harness();
+      expect(await h.run('code', 'Do something', '--repo', h.home)).toBe(1);
+      expect(h.err()).toMatch(/not inside a git repository/);
+      const repo = makeRepo(BUGGY_PROJECT);
+      expect(await h.run('code', 'Do something', '--repo', repo, '--test-cmd', 'npm test && curl x')).toBe(1);
+      expect(h.err()).toMatch(/needs a shell/);
+    });
   });
 });

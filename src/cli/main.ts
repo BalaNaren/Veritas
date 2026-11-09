@@ -7,7 +7,8 @@ import { CommandParser } from './parser.js';
 import { CLIError, type Command, type CommandContext } from './types.js';
 
 const GROUPS: { title: string; names: string[] }[] = [
-  { title: 'Do work', names: ['run', 'plan', 'approve', 'resume', 'cancel'] },
+  { title: 'Do work', names: ['run', 'code', 'plan', 'approve', 'resume', 'cancel'] },
+  { title: 'Keep coding work', names: ['apply', 'discard'] },
   { title: 'Look at work', names: ['list', 'status', 'show', 'export', 'cost'] },
   { title: 'Setup', names: ['setup', 'memory', 'config', 'doctor', 'version'] },
 ];

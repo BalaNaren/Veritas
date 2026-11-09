@@ -10,6 +10,9 @@ export function describeEvent(out: OutputFormatter, e: EventRow, verbose = false
   switch (e.type) {
     case 'clarify.started': return out.dim('Checking the goal...');
     case 'clarify.skipped': return out.dim('Could not check the goal for questions; continuing.');
+    case 'worktree.created': return out.dim(`Working in a separate copy on branch ${x.branch}`);
+    case 'tests.baseline': return out.dim(`Tests before any change: ${x.passed ? 'passed' : 'failing'}`);
+    case 'tests.ran': return `  ${x.passed ? out.success('tests passed') : out.warning('tests did not pass')} ${out.dim(String(x.phase))}`;
     case 'file.read': return out.dim(`Read ${x.name} (${x.parts} ${Number(x.parts) === 1 ? 'part' : 'parts'})`);
     case 'source.failed': return `  ${out.warning('could not fetch')} ${x.url} ${out.dim(String(x.message))}`;
     case 'verify.started': return out.dim('Collecting sources and checking every claim...');

@@ -12,6 +12,7 @@ import { taskDir } from '../storage/paths.js';
 import { EvidenceStore } from '../evidence/evidence-store.js';
 import { RunStore } from '../evidence/runs.js';
 import type { Sandbox } from '../sandbox/types.js';
+import type { CodingServices } from './executor.js';
 import { goalWithContext, workerPrompt, type DependencyResult } from './prompts.js';
 
 export type RunOutcome =
@@ -30,6 +31,8 @@ export interface SchedulerOptions {
   signal?: AbortSignal;
   /** Where analysis code runs; needed only for data tasks. */
   sandbox?: Sandbox;
+  /** The working copy and test runner; needed only for coding tasks. */
+  coding?: CodingServices;
   /** Attempts per task, including the first (default 2). */
   maxAttempts?: number;
   /** Wait before a retry, multiplied by the attempt number (default 1000 ms). */
@@ -95,7 +98,7 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
       store.updateSubtask(s.id, { attempts: attempt });
       let res: AgentRunResult = kind.executor ? await kind.executor({
         task, subtask: s, goal: goalWithContext(task.goal, task.assumptions), model, capUsd: currentCap, timeoutMs: opts.config.agentTimeoutMs, signal,
-        provider, evidence, runs, sandbox: opts.sandbox, homeDir: opts.config.homeDir,
+        provider, evidence, runs, sandbox: opts.sandbox, coding: opts.coding, homeDir: opts.config.homeDir,
       }) : await provider.run({
         prompt, model, cwd: agentCwd, addDirs: kind.fileAccess ? [agentCwd] : undefined,
         tools: kind.tools, allowedTools: kind.allowedTools, jsonSchema: kind.outputSchema,
@@ -108,7 +111,7 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
       emitCost();
 
       // Structured kinds must return valid JSON; a bad answer counts as a failed attempt so it is retried.
-      let output: unknown = res.text;
+      let output: unknown = kind.executor && res.json !== undefined ? res.json : res.text;
       if (res.ok && kind.outputSchema) {
         output = res.json ?? tryJsonParse(res.text);
         const problem = kind.validateOutput?.(output) ?? (output === undefined ? 'The agent did not return JSON.' : null);

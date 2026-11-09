@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A stand-in for the real agent runtime, used only by tests.
 // Behaviour is chosen by a directive inside the prompt, e.g. [[fake:sleep]].
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
 const prompt = readFileSync(0, 'utf8');
@@ -65,6 +65,14 @@ switch (mode) {
       { key: 't3', title: 'Combine', kind: 'general', instructions: 'Combine', dependsOn: ['t1', 't2'] },
     ], estimateUsd: { low: 0.1, high: 0.3 }, assumptions: ['Assumed English'] };
     print(envelope({ result: JSON.stringify(plan), structured_output: plan }));
+    break;
+  }
+  case 'edit': {
+    // Coding agent: writes one file in the folder it runs in. Directive: [[fake:edit:name=content]]
+    const eq = (arg ?? '').indexOf('=');
+    writeFileSync(arg.slice(0, eq), arg.slice(eq + 1) + '\n');
+    const out = { summary: 'Edited ' + arg.slice(0, eq) + '. All tests pass now.', notes: '' };
+    print(envelope({ result: JSON.stringify(out), structured_output: out, total_cost_usd: 0.03 }));
     break;
   }
   case 'findings': {
