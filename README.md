@@ -20,7 +20,7 @@ The recording above is the real terminal view, drawn from the events of a real r
 
 ## Quick start
 
-You need Node.js 22.13 or newer and [Claude Code](https://claude.com/claude-code), logged in. Veritas is not on npm yet, so run it from this folder:
+You need Node.js 22.13 or newer and [Claude Code](https://claude.com/claude-code), logged in. Veritas is not published yet (a packaged install, `npm install -g veritas-cli@0.1.0`, is prepared and tested; see [`docs/RELEASING.md`](docs/RELEASING.md)), so for now run it from this folder:
 
 ```
 npm ci
