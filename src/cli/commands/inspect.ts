@@ -1,4 +1,5 @@
 import { formatUsd } from '../../cost/estimate.js';
+import { EvidenceStore } from '../../evidence/evidence-store.js';
 import { TERMINAL_TASK_STATUSES } from '../../storage/models.js';
 import type { App } from '../app.js';
 import { describeEvent } from '../progress.js';
@@ -48,13 +49,47 @@ export function inspectCommands(app: App): Command[] {
         { name: 'json', type: 'boolean', description: 'Machine-readable output' },
         { name: 'events', type: 'boolean', description: 'Include the full event history' },
         { name: 'outputs', type: 'boolean', description: 'Include each task\'s output' },
+        { name: 'claims', type: 'boolean', description: 'List every claim with its verification status' },
+        { name: 'claim', type: 'number', description: 'Show one claim in full: source, exact quote, each check and the reason' },
       ],
       action: async (ctx) => {
         const task = requireTask(app, ctx.args[0]);
         const subtasks = app.store.listSubtasks(task.id);
         const approvals = app.store.listApprovals(task.id);
+        const evidence = new EvidenceStore(app.store, app.home);
         if (json(ctx.flags)) {
-          out.printJson({ task, subtasks, approvals, events: ctx.flags.events === true ? app.store.listEvents(task.id) : undefined });
+          out.printJson({
+            task, subtasks, approvals, claims: evidence.listClaims(task.id), sources: evidence.listSources(task.id),
+            events: ctx.flags.events === true ? app.store.listEvents(task.id) : undefined,
+          });
+          return ok;
+        }
+        if (ctx.flags.claim !== undefined) {
+          const seq = Number(ctx.flags.claim);
+          const c = evidence.listClaims(task.id).find((x) => x.seq === seq);
+          if (!c) throw new ValidationError(`This task has no claim ${ctx.flags.claim}. See \`veritas show ${task.id} --claims\`.`);
+          const src = c.sourceId ? evidence.getSource(c.sourceId) : undefined;
+          out.writeln(out.bold(`Claim ${c.seq} [${c.status}]${c.important ? ' (important)' : ''}`));
+          out.writeln(c.text);
+          out.writeln(`\nSource:  ${src ? `${src.finalUrl} (${src.quality}${src.publishedAt ? `, dated ${src.publishedAt}` : ''}, fetched ${src.fetchedAt})` : `${c.url ?? 'none given'} (not fetched)`}`);
+          out.writeln(`Quote:   ${c.quote ?? 'none given'}`);
+          if (c.reason) out.writeln(`Reason:  ${c.reason}`);
+          out.writeln('\nChecks:');
+          for (const k of c.checks) out.writeln(`  ${k.passed ? out.success('pass') : out.error('FAIL')}  ${k.step}: ${k.detail}`);
+          if (!c.checks.length) out.writeln('  (not checked yet)');
+          return ok;
+        }
+        if (ctx.flags.claims === true) {
+          const claims = evidence.listClaims(task.id);
+          if (!claims.length) { out.writeln('This task has no claims (only research tasks produce them).'); return ok; }
+          out.writeln(out.table({
+            columns: [
+              { key: 'seq', header: '#', width: 4, align: 'right' }, { key: 'status', header: 'Status', width: 10 },
+              { key: 'claim', header: 'Claim', width: 56 }, { key: 'reason', header: 'Reason', width: 34 },
+            ],
+            data: claims.map((c) => ({ seq: c.seq, status: c.status, claim: truncate(c.text, 56), reason: truncate(c.reason ?? '', 34) })),
+          }));
+          out.writeln(`Details of one claim: veritas show ${task.id} --claim <number>`);
           return ok;
         }
         out.writeln(out.bold(truncate(task.goal, 120)));

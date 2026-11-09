@@ -7,6 +7,9 @@ import { ClaudeCodeProvider } from '../../src/agents/claude-code.js';
 import type { ClaudeProbe, Runtime } from '../../src/cli/app.js';
 import { main } from '../../src/cli/main.js';
 import { OutputFormatter } from '../../src/cli/output.js';
+import { EvidenceStore } from '../../src/evidence/evidence-store.js';
+import { ensureHome, dbPath } from '../../src/storage/paths.js';
+import { Store } from '../../src/storage/store.js';
 
 const FAKE = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'fake-claude.mjs');
 const homes: string[] = [];
@@ -160,5 +163,27 @@ describe('veritas CLI', () => {
     const u = harness();
     expect(await u.run('run', '[[fake:ask]] tides', '--yes-plan', '--clarify')).toBe(0);
     expect(u.out()).toContain('Which region? Global (assumed)');
+  });
+
+  it('lists claims and shows one in full', async () => {
+    const h = harness();
+    ensureHome(h.home);
+    const store = Store.open(dbPath(h.home));
+    const task = store.createTask({ slug: 't', goal: 'g', type: 'research', budgetUsd: 1, mode: 'x', cwd: '/' });
+    const ev = new EvidenceStore(store, h.home);
+    const src = ev.addSource({ taskId: task.id, url: 'https://www.nasa.gov/a', finalUrl: 'https://www.nasa.gov/a', contentType: 'text/html', bytes: 1, sha256: 'x', fetchedAt: '2026-01-01T00:00:00Z', text: 'The Moon is far away from us.' });
+    const c = ev.addClaim({ taskId: task.id, text: 'The Moon is far away.', type: 'fact', url: src.url, quote: 'The Moon is far away from us.', important: true });
+    ev.updateClaim(c.id, { status: 'confirmed', sourceId: src.id, checks: [{ step: 'quote_matches', passed: true, detail: 'Found it' }] });
+    store.close();
+
+    expect(await h.run('show', task.id, '--claims')).toBe(0);
+    expect(h.out()).toContain('confirmed');
+    expect(h.out()).toContain('The Moon is far away.');
+    expect(await h.run('show', task.id, '--claim', '1')).toBe(0);
+    expect(h.out()).toContain('Claim 1 [confirmed] (important)');
+    expect(h.out()).toContain('Quote:   The Moon is far away from us.');
+    expect(h.out()).toContain('quote_matches: Found it');
+    expect(await h.run('show', task.id, '--claim', '9')).toBe(1);
+    expect(h.err()).toContain('no claim 9');
   });
 });
