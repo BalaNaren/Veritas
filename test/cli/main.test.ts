@@ -186,4 +186,21 @@ describe('veritas CLI', () => {
     expect(await h.run('show', task.id, '--claim', '9')).toBe(1);
     expect(h.err()).toContain('no claim 9');
   });
+
+  it('exports a finished report and refuses unfinished ones', async () => {
+    const h = harness();
+    expect(await h.run('run', GOAL, '--yes-plan')).toBe(0);
+    const id = idOf(h.out());
+    expect(await h.run('export', id, '--as', 'docx')).toBe(0);
+    expect(existsSync(join(h.home, 'tasks', id, 'result.docx'))).toBe(true);
+    const target = join(h.home, 'out.pdf');
+    expect(await h.run('export', id, '--as', 'pdf', '--out', target)).toBe(0);
+    expect(existsSync(target)).toBe(true);
+    expect(await h.run('export', id, '--as', 'rtf')).toBe(2);
+
+    const p = harness({ home: h.home });
+    await p.run('plan', GOAL);
+    expect(await p.run('export', idOf(p.out()))).toBe(1);
+    expect(p.err()).toMatch(/no finished report/);
+  });
 });

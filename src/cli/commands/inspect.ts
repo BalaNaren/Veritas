@@ -4,6 +4,11 @@ import { TERMINAL_TASK_STATUSES } from '../../storage/models.js';
 import type { App } from '../app.js';
 import { describeEvent } from '../progress.js';
 import { formatPlan, subtaskTable, taskTable, truncate } from '../format.js';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { taskDir } from '../../storage/paths.js';
+import { writeFileAtomic } from '../../shared/fs.js';
+import { EXPORT_FORMATS, exportReport, type ExportFormat } from '../../write/export.js';
 import { ValidationError, type Command, type CommandResult } from '../types.js';
 import { requireTask } from './run.js';
 
@@ -109,6 +114,26 @@ export function inspectCommands(app: App): Command[] {
             out.writeln(`  ${e.ts}  ${e.type}  ${describeEvent(out, e, true)?.trim() ?? ''}`);
           }
         }
+        return ok;
+      },
+    },
+    {
+      name: 'export',
+      description: 'Save a finished report as Markdown, Word (docx) or PDF',
+      options: [
+        { name: 'as', type: 'string', description: 'md, docx or pdf (default docx)', choices: [...EXPORT_FORMATS] },
+        { name: 'out', type: 'string', description: 'Where to save it (default: the task folder)' },
+      ],
+      examples: [{ command: 'veritas export task_1a2b --as pdf --out ~/Desktop/report.pdf', description: 'Save a PDF on the desktop' }],
+      action: async (ctx) => {
+        const task = requireTask(app, ctx.args[0]);
+        if (task.status !== 'done' || !task.resultPath) throw new ValidationError(`This task has no finished report yet (status: ${task.status}).`);
+        const format = (ctx.flags.as === undefined ? 'docx' : String(ctx.flags.as)) as ExportFormat;
+        if (!EXPORT_FORMATS.includes(format)) throw new ValidationError(`--as must be one of ${EXPORT_FORMATS.join(', ')}.`);
+        const markdown = readFileSync(task.resultPath, 'utf8');
+        const target = ctx.flags.out ? resolve(app.rt.cwd, String(ctx.flags.out)) : join(taskDir(app.home, task.id), `result.${format}`);
+        writeFileAtomic(target, await exportReport(markdown, format));
+        out.writeln(`Saved ${target}`);
         return ok;
       },
     },

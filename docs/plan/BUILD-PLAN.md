@@ -216,7 +216,7 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 **6. Writer / assembler** (`src/write/`)
 - [x] Writer agent (opus, no tools) receives only verified/flagged claims with IDs; must cite `[c<ID>]` for every factual statement; analysis sentences marked.
 - [x] Post-check (code): every sentence with a number/named fact references a claim ID; unreferenced factual sentences are sent back once, then removed or labeled analysis.
-- [~] Renderers: Markdown done (citations → numbered sources with URL + quote, verification summary appended, "Assumptions" at top). DOCX (pinned `docx`) and PDF (pinned `pdfmake`) still to do.
+- [x] Renderers: Markdown (citations → numbered sources with URL + quote, verification summary appended, "Assumptions" at top), DOCX (pinned `docx@9.15.3`) and PDF (pinned `pdfmake@0.3.14`, bundled Roboto fonts, no file or URL access beyond them) via `veritas export <task> --as md|docx|pdf`.
 
 **7. Golden verification set** (`test/golden/`)
 - [~] 238 labelled claims (supported, stretched, contradicted, fabricated quote, wrong number, invented source) over 8 synthetic source passages, stored offline in `test/golden/facts.json`. The ~50 end-to-end research questions are not built yet (they need live web access and a manual run).
