@@ -56,6 +56,7 @@ export type VerbosityLevel = 'quiet' | 'normal' | 'verbose' | 'debug';
 export interface TextStream {
   write(text: string): unknown;
   isTTY?: boolean;
+  columns?: number;
 }
 
 export class OutputFormatter {
@@ -169,6 +170,16 @@ export class OutputFormatter {
   }
 
   /** Whether transient terminal UI (spinners/progress redraws) is safe. */
+  /** The stream this formatter writes to (so a live panel can draw on the same terminal). */
+  stream(): TextStream {
+    return this.outputStream;
+  }
+
+  /** Width of the terminal, if known. */
+  columns(): number | undefined {
+    return this.outputStream.columns;
+  }
+
   supportsInteractiveOutput(): boolean {
     return this.outputStream.isTTY === true;
   }

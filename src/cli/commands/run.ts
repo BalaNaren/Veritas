@@ -9,6 +9,8 @@ import type { Approver, ClarifyOptions } from '../../engine/engine.js';
 import type { TaskRow } from '../../storage/models.js';
 import { App } from '../app.js';
 import { formatPlan } from '../format.js';
+import { LiveView } from '../live.js';
+import { SnapshotSource } from '../live-snapshot.js';
 import { followTask } from '../progress.js';
 import { ValidationError, type Command, type CommandContext, type CommandResult } from '../types.js';
 
@@ -93,19 +95,39 @@ async function askQuestions(app: App, questions: ClarifyQuestion[]): Promise<Rec
 export async function drive(app: App, taskId: string, opts: { yesPlan?: boolean; interactive: boolean; clarify?: 'off' | 'defaults' | 'ask' }): Promise<number> {
   const { out } = app.rt;
   const engine = app.engine({ preApprove: opts.yesPlan ? ['plan.start'] : [] });
-  const stopFollowing = followTask(out, (fn, id) => engine.events.subscribe(fn, id), taskId);
+  // On a real terminal the progress is a panel that redraws in place; otherwise (pipes, files, --verbose) it is plain lines.
+  const source = new SnapshotSource(app.store, app.config.homeDir, taskId);
+  const useLive = out.supportsInteractiveOutput() && !out.isQuiet() && !out.isVerbose() && out.columns() !== undefined;
+  const live = useLive
+    ? new LiveView({ stream: out.stream(), fmt: out, snapshot: source.snapshot, unicode: /utf-?8/i.test(app.rt.env.LC_ALL ?? app.rt.env.LC_CTYPE ?? app.rt.env.LANG ?? '') })
+    : undefined;
+  const stopFollowing = live
+    ? engine.events.subscribe((e) => { source.onEvent(e); live.render(); }, taskId)
+    : followTask(out, (fn, id) => engine.events.subscribe(fn, id), taskId);
+  // Questions and approvals are asked below the panel, so it is paused while a person answers.
+  const whilePaused = <A extends unknown[], R>(fn: (...a: A) => Promise<R>) => async (...a: A): Promise<R> => {
+    live?.pause();
+    try { return await fn(...a); } finally { live?.resume(); }
+  };
   const abort = new AbortController();
   let interrupts = 0;
   const stopListening = app.rt.onInterrupt(() => {
     interrupts++;
-    if (interrupts === 1) { out.writeln(out.warning('Stopping... press Ctrl-C again to quit immediately.')); abort.abort(); }
-    else process.exit(130);
+    if (interrupts === 1) {
+      abort.abort();
+      if (live) source.setNote('Stopping... press Ctrl-C again to quit immediately.');
+      else out.writeln(out.warning('Stopping... press Ctrl-C again to quit immediately.'));
+    } else { live?.stop(); process.exit(130); }
   });
+  live?.start();
   try {
-    const clarify: ClarifyOptions = { mode: opts.clarify ?? 'off', ask: (q) => askQuestions(app, q) };
-    const result = await engine.execute(taskId, { signal: abort.signal, clarify, approver: opts.interactive ? makeApprover(app) : undefined });
+    const clarify: ClarifyOptions = { mode: opts.clarify ?? 'off', ask: whilePaused((q: ClarifyQuestion[]) => askQuestions(app, q)) };
+    const approver = opts.interactive ? whilePaused(makeApprover(app)) : undefined;
+    const result = await engine.execute(taskId, { signal: abort.signal, clarify, approver });
+    live?.stop();
     return report(app, result.task, result.resultPath);
   } finally {
+    live?.stop();
     stopListening();
     stopFollowing();
   }
