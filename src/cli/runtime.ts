@@ -1,5 +1,6 @@
 import { createInterface } from 'node:readline/promises';
 import { AGENT_ENV_NAMES, ClaudeCodeProvider } from '../agents/claude-code.js';
+import { AnthropicApiProvider } from '../agents/anthropic-api.js';
 import { resolveClaudeLaunchCommand } from '../agents/claude-command.js';
 import { pickEnv } from '../shared/env.js';
 import { runProcess } from '../shared/process.js';
@@ -38,7 +39,14 @@ export function createRuntime(): Runtime {
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       try { return await rl.question(question); } finally { rl.close(); }
     },
-    makeProvider: (config) => new ClaudeCodeProvider({ binary: config.claudeBinary, defaultTimeoutMs: config.agentTimeoutMs }),
+    makeProvider: (config) => {
+      if (config.provider === 'anthropic-api') {
+        const apiKey = env.ANTHROPIC_API_KEY;
+        if (!apiKey) throw new Error('API mode needs your key in the ANTHROPIC_API_KEY environment variable. It is never stored by Veritas.');
+        return new AnthropicApiProvider({ apiKey, defaultTimeoutMs: config.agentTimeoutMs });
+      }
+      return new ClaudeCodeProvider({ binary: config.claudeBinary, defaultTimeoutMs: config.agentTimeoutMs });
+    },
     probeClaude,
     async setupRuntime(home, onStep) {
       if (SandboxExecSandbox.available()) await setupPython(home, { onStep });

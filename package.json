@@ -48,6 +48,7 @@
     "prepublishOnly": "npm test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.6.0",
     "docx": "9.15.3",
     "exceljs": "4.4.0",
     "mammoth": "1.13.0",

@@ -18,6 +18,7 @@ export function defaultConfig(home: string): VeritasConfig {
     maxSubtasks: 8,
     agentTimeoutMs: 10 * 60_000,
     memoryEnabled: true,
+    provider: 'claude-code',
     cli: { colorOutput: true, interactive: true, verbosity: 'normal', outputFormat: 'text', progressStyle: 'bar' },
   };
 }
@@ -39,6 +40,7 @@ export function validateConfig(c: VeritasConfig): string[] {
     problems.push('defaultBudgetUsd must be a number above 0 and at most 1000');
   }
   if (!int(c.agentTimeoutMs, 10_000, 2 * 60 * 60_000)) problems.push('agentTimeoutMs must be between 10000 and 7200000');
+  if (c.provider !== 'claude-code' && c.provider !== 'anthropic-api') problems.push('provider must be claude-code or anthropic-api');
   if (c.claudeBinary !== undefined && (typeof c.claudeBinary !== 'string' || !c.claudeBinary.startsWith('/') && !/^[A-Za-z]:\\/.test(c.claudeBinary))) {
     problems.push('claudeBinary must be an absolute path');
   }
@@ -99,7 +101,7 @@ export function flattenConfig(config: VeritasConfig): Record<string, string | nu
 /** Keys users may change with `veritas config set`. */
 export const SETTABLE_KEYS = [
   'models.planner', 'models.clarifier', 'models.worker', 'models.checker', 'models.writer',
-  'maxConcurrent', 'defaultBudgetUsd', 'maxSubtasks', 'agentTimeoutMs', 'claudeBinary',
+  'maxConcurrent', 'defaultBudgetUsd', 'maxSubtasks', 'agentTimeoutMs', 'claudeBinary', 'provider',
   'memoryEnabled', 'cli.colorOutput', 'cli.verbosity',
 ] as const;
 

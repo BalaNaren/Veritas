@@ -70,6 +70,8 @@ npm run build
 node bin/veritas.js doctor        # checks Node, your Claude login and the data folder
 ```
 
+Prefer an API key to a Claude login? `node bin/veritas.js config set provider anthropic-api` and set `ANTHROPIC_API_KEY` (tested only against a mock server so far; code tasks that run tests are not supported in this mode).
+
 Then try one of these (add `--budget 1` to cap the spending at one dollar):
 
 ```

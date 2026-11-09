@@ -88,6 +88,8 @@ export interface VeritasConfig {
   agentTimeoutMs: number;
   /** Remember useful sources and your stated preferences across tasks (stored only on this machine). */
   memoryEnabled: boolean;
+  /** Where agents run: "claude-code" (your Claude Code login, default) or "anthropic-api" (an API key in ANTHROPIC_API_KEY). */
+  provider: 'claude-code' | 'anthropic-api';
   /** Absolute path of the agent runtime binary; discovered automatically when unset. */
   claudeBinary?: string;
   cli: CLIPreferences;

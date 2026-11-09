@@ -19,7 +19,7 @@ Veritas is an open-source (Apache-2.0) AI task agent: give it a goal, a planner 
 ## Technical decisions
 - TypeScript, ESM, `module: NodeNext`, Node ≥ 22.13, `tsc` build, vitest.
 - Storage: built-in `node:sqlite` (FTS5 available) at `~/.veritas/veritas.db` (`VERITAS_HOME` overrides).
-- Model access **mode A (default):** each agent is a headless Claude Code run — `claude -p --output-format json --no-session-persistence --model <alias> --permission-mode dontAsk [--allowed-tools …] [--json-schema …] [--max-budget-usd …]`, prompt on stdin, env allowlist, process-group kill on timeout. Do **not** use `--bare` (it requires an API key). Mode B (Anthropic API key) comes in M5.
+- Model access **mode A (default):** each agent is a headless Claude Code run — `claude -p --output-format json --no-session-persistence --model <alias> --permission-mode dontAsk [--allowed-tools …] [--json-schema …] [--max-budget-usd …]`, prompt on stdin, env allowlist, process-group kill on timeout. Do **not** use `--bare` (it requires an API key). Mode B (`provider: anthropic-api`, key in `ANTHROPIC_API_KEY`, never stored) is `src/agents/anthropic-api.ts`: built against a mock server only, never run against the real API; it refuses the Bash tool.
 - Model roles: planner/writer `opus`, workers `sonnet`, checker `haiku` (configurable).
 
 ## Working with the owner

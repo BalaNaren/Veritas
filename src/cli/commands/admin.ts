@@ -33,7 +33,10 @@ export async function runDoctor(app: App): Promise<Check[]> {
     checks.push({ name: 'Settings', ok: false, detail: e instanceof Error ? e.message : String(e) });
   }
 
-  if (config) {
+  if (config?.provider === 'anthropic-api') {
+    const key = app.rt.env.ANTHROPIC_API_KEY;
+    checks.push({ name: 'API key', ok: Boolean(key), detail: key ? 'found in ANTHROPIC_API_KEY (never stored by Veritas)' : 'API mode is on but ANTHROPIC_API_KEY is not set.' });
+  } else if (config) {
     const probe = await app.rt.probeClaude(config);
     checks.push({ name: 'Claude Code', ok: probe.found, detail: probe.found ? `${probe.path ?? 'found'}${probe.version ? ` (${probe.version})` : ''}` : probe.detail });
     if (probe.found) checks.push({ name: 'Claude login', ok: probe.loggedIn === true, detail: probe.loggedIn ? probe.detail : `${probe.detail} Run \`claude\` once and log in.` });
