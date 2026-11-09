@@ -253,11 +253,11 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 **Goal:** real code changes in a separate git worktree, real test results, nothing committed/pushed/merged without approval.
 
 ### M4 tasks
-- [ ] **Worktrees** (§8): adapt coordinator → `src/coding/worktrees.ts` with lock file, base-branch assertion, conflict detection, cleanup; branch prefix `veritas/`; all git via hardened safe-git.
-- [ ] **Coding agents**: `claude -p` with `cwd` = worktree, `--permission-mode acceptEdits`, `--allowed-tools Read Edit Write Grep Glob` + `Bash(<approved test command>)` only; parallel agents get separate worktrees or file-scoped leases (fenced lease reference, persisted in SQLite).
-- [ ] **Test runs**: Veritas itself runs the project's test command (approved on first use per project, `cmd.first_run`) via safe executor; stores exit code + output; any "tests pass" claim must reference a `test_runs` row (verifier rule).
-- [ ] **Delivery**: diff summary, test results, `veritas apply <task>` (approval) to merge into a branch; optional PR creation via `gh` (approval, `git.push`).
-- [ ] **Guards**: never touch the user's working tree; refuse dirty base when integrating; approvals for commit/push/merge always asked.
+- [x] **Worktrees** (§8): adapt coordinator → `src/coding/worktrees.ts` with lock file, base-branch assertion, conflict detection, cleanup; branch prefix `veritas/`; all git via hardened safe-git.
+- [x] **Coding agents**: `claude -p` with `cwd` = worktree, file tools limited to the worktree by path rule, plus `Bash(<approved test command>)` only (dontAsk mode; acceptEdits was not needed). *(Parallel coding agents with separate worktrees or leases are not built: one coding agent per task.)*
+- [x] **Test runs**: Veritas itself runs the project's test command (approved on first use per project, `cmd.first_run`) via safe executor; stores exit code + output; any "tests pass" claim must reference a `test_runs` row (verifier rule).
+- [x] **Delivery**: diff summary, test results, `veritas apply <task>` (approval) to merge into a branch; optional PR creation via `gh` (approval, `git.push`).
+- [x] **Guards**: never touch the user's working tree; refuse dirty base when integrating; approvals for commit/push/merge always asked.
 
 ### M4 exit criteria
 - Coding tasks never modify the user's working files directly; every "tests pass" claim is backed by a captured test run; commit/push/merge always require approval.
