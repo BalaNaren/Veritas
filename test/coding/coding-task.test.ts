@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -63,7 +63,10 @@ describe('coding tasks', () => {
     expect(calls[0]!.cwd).toBe(info.worktree);
     expect(calls[0]!.cwd.startsWith(t.repo)).toBe(false);
     expect(calls[0]!.tools).toEqual(['Read', 'Edit', 'Write', 'Grep', 'Glob', 'Bash']);
-    expect(calls[0]!.allowedTools).toEqual(['Read', 'Edit', 'Write', 'Grep', 'Glob', 'Bash(node --test)']);
+    // Every file tool is limited to the working copy by path (a bare tool name works anywhere on the computer).
+    const scope = `//${realpathSync(info.worktree!).replace(/^\/+/, '')}/**`;
+    expect(calls[0]!.allowedTools).toEqual([`Read(${scope})`, `Edit(${scope})`, `Write(${scope})`, `Grep(${scope})`, `Glob(${scope})`, 'Bash(node --test)']);
+    expect(calls[0]!.allowedTools!.some((t) => ['Read', 'Edit', 'Write', 'Grep', 'Glob'].includes(t))).toBe(false);
     expect(calls[0]!.prompt).toContain('failed (exit code 1)');   // it was told the tests failed before its change
 
     // The user's folder and branches are exactly as they were, apart from the new Veritas branch.
@@ -119,7 +122,8 @@ describe('coding tasks', () => {
     const t = setup(provider, { 'add.js': 'export function add(a, b) {\n  return a - b;\n}\n' });
     const task = await t.engine.createCodingTask('Fix add', { repo: t.repo });
     const r = await t.engine.execute(task.id, { approver: yes });
-    expect(calls[0]!.allowedTools).toEqual(['Read', 'Edit', 'Write', 'Grep', 'Glob']);
+    expect(calls[0]!.allowedTools!.every((t) => /^(Read|Edit|Write|Grep|Glob)\(\/\/.+\/\*\*\)$/.test(t))).toBe(true);
+    expect(calls[0]!.allowedTools).toHaveLength(5);
     expect(calls[0]!.tools).not.toContain('Bash');
     expect(readFileSync(r.resultPath!, 'utf8')).toContain('No tests were run');
   });

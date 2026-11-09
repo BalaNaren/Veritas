@@ -9,6 +9,7 @@ import { getKind } from './kinds.js';
 import { tryJsonParse } from '../shared/json.js';
 import { join } from 'node:path';
 import { taskDir } from '../storage/paths.js';
+import { scopeToFolder } from '../agents/scope.js';
 import { EvidenceStore } from '../evidence/evidence-store.js';
 import { RunStore } from '../evidence/runs.js';
 import type { Sandbox } from '../sandbox/types.js';
@@ -101,7 +102,7 @@ export async function runSubtasks(opts: SchedulerOptions): Promise<RunOutcome> {
         provider, evidence, runs, sandbox: opts.sandbox, coding: opts.coding, homeDir: opts.config.homeDir,
       }) : await provider.run({
         prompt, model, cwd: agentCwd, addDirs: kind.fileAccess ? [agentCwd] : undefined,
-        tools: kind.tools, allowedTools: kind.allowedTools, jsonSchema: kind.outputSchema,
+        tools: kind.tools, allowedTools: kind.fileAccess && kind.allowedTools ? scopeToFolder(kind.allowedTools, agentCwd) : kind.allowedTools, jsonSchema: kind.outputSchema,
         maxBudgetUsd: currentCap, timeoutMs: opts.config.agentTimeoutMs, signal,
       });
       totalCost += res.costUsd;

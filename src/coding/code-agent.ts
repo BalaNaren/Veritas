@@ -1,3 +1,4 @@
+import { scopeToFolder, ScopeError } from '../agents/scope.js';
 import type { AgentRunResult } from '../agents/provider.js';
 import type { Executor } from '../engine/executor.js';
 import { tryJsonParse } from '../shared/json.js';
@@ -23,7 +24,12 @@ export const runCodeTask: Executor = async (ctx) => {
   const tokens = { input: 0, output: 0 };
   const testCommand = info.testCommand;
   // The agent may run exactly the approved test command, nothing else.
-  const allowed = [...EDIT_TOOLS, ...(testCommand ? [`Bash(${parseCommand(testCommand).join(' ')})`] : [])];
+  // File tools are limited to the working copy by path rule; without that they work anywhere on the computer.
+  let allowed: string[];
+  try { allowed = scopeToFolder([...EDIT_TOOLS, ...(testCommand ? [`Bash(${parseCommand(testCommand).join(' ')})`] : [])], info.worktree); } catch (e) {
+    if (e instanceof ScopeError) return failure(e.message, 0, 'unavailable');
+    throw e;
+  }
   const baselineRun = ctx.coding.lastRun('baseline');
   const baseline = baselineRun ? { passed: baselineRun.passed, exitCode: baselineRun.exitCode, tail: baselineRun.output } : null;
 
