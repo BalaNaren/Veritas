@@ -59,9 +59,16 @@ function dayNumbers(text: string): Set<number> {
   return days;
 }
 
+const LOCATOR_RE = /(?:\b(?:pages?|pp?\.|clauses?|sections?|articles?|paragraphs?|para\.?|schedule|appendix|annex|exhibit|item|table|figure|chapter|line|lines|row|rows|sheet)\b|§+)\s*\.?\s*\d+(?:\.\d+)*(?:\s*\([a-z0-9]{1,3}\))*(?:\s*(?:,|and|&|-|–|to)\s*\d+(?:\.\d+)*)*/gi;
+
+/** Where in a document something is ("page 2", "Clause 4.1", "Table 3") is a pointer, not a figure the quote has to contain. */
+export function stripLocators(text: string): string {
+  return text.replace(LOCATOR_RE, ' ');
+}
+
 /** Check that all numbers in `claim` appear in `passage` (same value; a percentage only matches a percentage). */
 export function checkNumbers(claim: string, passage: string): NumberCheck {
-  const claimNumbers = extractNumbers(claim);
+  const claimNumbers = extractNumbers(stripLocators(claim));
   const available = extractNumbers(passage);
   const absent = claimNumbers.filter((c) => !available.some((a) => a.value === c.value && (!c.percent || a.percent)));
   // A year or a date's day that is merely extra context is weaker than a wrong figure, but only when the passage names no year;

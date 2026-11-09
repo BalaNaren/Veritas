@@ -85,6 +85,17 @@ describe('checkNumbers', () => {
   });
 });
 
+describe('locators are not figures', () => {
+  it('ignores page, clause and table references in the claim', () => {
+    expect(checkNumbers('Clause 2 (Fees), page 2: the Client pays 8,200 dollars a month.', 'the Client shall pay a monthly fee of 8,200 dollars').ok).toBe(true);
+    expect(checkNumbers('Under section 4.1(a) and 4.2 the cap is 12 months.', 'capped at the fees paid in the preceding 12 months').ok).toBe(true);
+    expect(checkNumbers('See Table 3 and pages 5-7 and § 9.', 'nothing numeric here').ok).toBe(true);
+  });
+  it('still checks the figures next to a locator', () => {
+    expect(checkNumbers('On page 2 the fee is 9,000 dollars.', 'the fee is 8,200 dollars').ok).toBe(false);
+  });
+});
+
 describe('year and date context', () => {
   it('treats a year the quote does not mention as context, not as a wrong figure', () => {
     const r = checkNumbers('In 2024, packs averaged $97/kWh.', 'packs averaged $97/kWh');
