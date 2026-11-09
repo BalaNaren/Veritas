@@ -224,8 +224,8 @@ Event types (append-only, drive live progress and `veritas show`): `task.created
 
 ### M2 exit criteria
 - Research reports pass the golden set with **zero invented sources** and **zero fabricated quotes** (code checks).
-- Checker accuracy measured and recorded with the method (PRODUCT.md §16.7 baseline).
-- Cost per typical report measured and documented.
+- Checker accuracy measured and recorded with the method (PRODUCT.md §16.7 baseline). *(Done: `docs/eval/verify-2026-11-08.md`.)*
+- Cost per typical report measured and documented. *(Done: `docs/eval/research-cost-2026-11-08.md`.)*
 
 ---
 
