@@ -12,6 +12,8 @@ export interface WriteOptions {
   assumptions: readonly string[];
   /** Confirmed and flagged claims only. */
   claims: readonly ClaimRow[];
+  /** Descriptions of charts the system adds after the report, so the writer can refer to them. */
+  charts?: readonly string[];
   signal?: AbortSignal;
 }
 
@@ -21,7 +23,7 @@ export type WriteOutcome =
 
 const asData = (text: string): string => text.replace(/<\/?(claims|goal|draft)\b[^>]*>/gi, '');
 
-export function writerPrompt(goal: string, assumptions: readonly string[], claims: readonly ClaimRow[], feedback?: { draft: string; violations: readonly Violation[] }): string {
+export function writerPrompt(goal: string, assumptions: readonly string[], claims: readonly ClaimRow[], feedback?: { draft: string; violations: readonly Violation[] }, charts: readonly string[] = []): string {
   const list = claims.map((c) => `[c${c.seq}] ${c.status === 'flagged' ? `(FLAGGED: ${asData(c.reason ?? 'weak evidence')}) ` : ''}${asData(c.text)}`).join('\n');
   const decided = assumptions.length ? `\nDecisions made with the user:\n${assumptions.map((a) => `- ${asData(a)}`).join('\n')}\n` : '';
   return `You write the final report for a user. You may use ONLY the checked claims below. Nothing else is known to you.
@@ -32,6 +34,7 @@ Rules:
 - Do not add any fact, number, name or date that is not in the claims. You may combine and compare claims, but every number you write must appear in a claim you cite.
 - Claims marked FLAGGED are weaker. Word them with care ("according to", "reportedly") and say what the flag is when it matters, but still cite them.
 - If you add your own reasoning or interpretation, put it in its own sentence starting with "Analysis:". Analysis must not introduce new facts.
+- The system adds charts after your report${charts.length ? `: ${charts.map((c) => `"${asData(c)}"`).join('; ')}. You may say that a chart below shows these things, but never describe numbers from a chart` : '. There are none, so never mention a chart'}. Never say that a chart is missing when one is listed.
 - If the claims do not cover part of the goal, say so plainly in a short "Gaps" section instead of filling the gap.
 - Do not write web addresses, file names, page numbers or source names. The system adds a numbered source list that shows each file and page or web address, so never say that references are missing.
 - When the goal compares several things (documents, products, options), use a Markdown table: a header row, the item names in the first column, and one short statement per other cell that ends with its citation, for example "90 days notice [c4]". Write "—" in a cell the claims do not cover. Never fill a cell from memory.
@@ -66,12 +69,12 @@ export async function writeReport(o: WriteOptions): Promise<WriteOutcome> {
     return res.ok && res.text.trim() ? res.text.trim() : { error: res.error?.message ?? 'The writer returned nothing.' };
   };
 
-  let draft = await ask(writerPrompt(o.goal, o.assumptions, o.claims));
+  let draft = await ask(writerPrompt(o.goal, o.assumptions, o.claims, undefined, o.charts));
   if (typeof draft !== 'string') return { ok: false, error: `Writing failed: ${draft.error}`, costUsd: cost };
   let check = checkReport(draft, o.claims);
 
   if (check.violations.length) {
-    const second = await ask(writerPrompt(o.goal, o.assumptions, o.claims, { draft, violations: check.violations }));
+    const second = await ask(writerPrompt(o.goal, o.assumptions, o.claims, { draft, violations: check.violations }, o.charts));
     if (typeof second === 'string') { draft = second; check = checkReport(draft, o.claims); }
   }
 

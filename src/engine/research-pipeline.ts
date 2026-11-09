@@ -82,28 +82,10 @@ export async function finishResearch(d: PipelineDeps, task: TaskRow, signal?: Ab
   const summary = summarize(evidence, task.id);
   events.emit(task.id, 'verify.done', { confirmed: summary.confirmed, flagged: summary.flagged, removed: summary.removed, notChecked: summary.notChecked });
 
-  // 3. Write from what survived.
-  store.updateTask(task.id, { status: 'writing' });
-  const claims = evidence.listClaims(task.id);
-  const usable = claims.filter((c) => c.status === 'confirmed' || c.status === 'flagged');
-  const notes: string[] = [];
-  if (summary.notChecked) notes.push(`${summary.notChecked} claim(s) were not checked because the budget was reached. They are left out of the report.`);
-
-  let body = '';
-  let analysisSentences = 0;
-  let removedSentences: string[] = [];
-  if (usable.length) {
-    const written = await writeReport({ provider: d.provider, config: d.config, cwd: task.cwd, goal: task.goal, assumptions: task.assumptions, claims: usable, signal });
-    if (written.costUsd > 0) store.addSpent(task.id, written.costUsd);
-    if (!written.ok) return signal?.aborted ? interrupted() : { status: 'failed', error: written.error };
-    ({ body, analysisSentences, removedSentences } = written);
-  } else {
-    body = 'No claim survived checking, so there is nothing sourced to report. See the verification summary below for what was found and why it was not accepted.';
-  }
-
-  // 4. Save, together with the code behind every computed number and the charts the code drew.
+  // Charts the analysis code drew for runs whose numbers survived checking.
   const dir = taskDir(d.config.homeDir, task.id);
   ensureDir(dir);
+  const claims = evidence.listClaims(task.id);
   const usedRunIds = new Set(claims.filter((c) => c.status !== 'removed' && c.type === 'computed' && c.url?.startsWith('run:')).map((c) => c.url!.slice(4)));
   const runs = runStore.listRuns(task.id).filter((r) => usedRunIds.has(r.id)).map((r) => ({ id: r.id, code: r.code, attempt: r.attempt, backend: r.backend }));
   const charts: { path: string; caption: string }[] = [];
@@ -121,6 +103,26 @@ export async function finishResearch(d: PipelineDeps, task: TaskRow, signal?: Ab
       charts.push({ path: `charts/${name}`, caption: c.caption });
     }
   }
+
+  // 3. Write from what survived.
+  store.updateTask(task.id, { status: 'writing' });
+  const usable = claims.filter((c) => c.status === 'confirmed' || c.status === 'flagged');
+  const notes: string[] = [];
+  if (summary.notChecked) notes.push(`${summary.notChecked} claim(s) were not checked because the budget was reached. They are left out of the report.`);
+
+  let body = '';
+  let analysisSentences = 0;
+  let removedSentences: string[] = [];
+  if (usable.length) {
+    const written = await writeReport({ provider: d.provider, config: d.config, cwd: task.cwd, goal: task.goal, assumptions: task.assumptions, claims: usable, charts: charts.map((c) => c.caption), signal });
+    if (written.costUsd > 0) store.addSpent(task.id, written.costUsd);
+    if (!written.ok) return signal?.aborted ? interrupted() : { status: 'failed', error: written.error };
+    ({ body, analysisSentences, removedSentences } = written);
+  } else {
+    body = 'No claim survived checking, so there is nothing sourced to report. See the verification summary below for what was found and why it was not accepted.';
+  }
+
+  // 4. Save, together with the code behind every computed number and the charts the code drew.
   const markdown = renderMarkdown({
     goal: task.goal, assumptions: task.assumptions, body, claims, sources: evidence.listSources(task.id),
     summary, analysisSentences, removedSentences, notes, runs, charts,

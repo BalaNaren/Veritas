@@ -124,6 +124,26 @@ describe('verifyClaims: code checks', () => {
   });
 });
 
+describe('verifyClaims: computed claims', () => {
+  const results = 'revenue.2023: 3324.78\nrevenue.2024: 4780.6\ngrowth_pct: 43.79';
+  it('accepts a year that appears anywhere in the run\'s own output, and rounding of stored values', async () => {
+    const t = setup();
+    t.addSource('run:abc', results);
+    const c = t.claim({ text: 'Revenue grew 43.8% from 2023 to 2024.', type: 'computed', url: 'run:abc', quote: 'growth_pct: 43.79' });
+    await verifyClaims({ evidence: t.evidence, checker: scripted().checker, taskId: t.task.id });
+    expect(t.evidence.getClaim(c.id)).toMatchObject({ status: 'confirmed', reason: null });
+  });
+  it('still flags a year the run never mentions, and removes a figure it never produced', async () => {
+    const t = setup();
+    t.addSource('run:abc', results);
+    const year = t.claim({ text: 'Revenue grew 43.8% from 2019 to 2020.', type: 'computed', url: 'run:abc', quote: 'growth_pct: 43.79' });
+    const wrong = t.claim({ text: 'Revenue grew 50%.', type: 'computed', url: 'run:abc', quote: 'growth_pct: 43.79' });
+    await verifyClaims({ evidence: t.evidence, checker: scripted().checker, taskId: t.task.id });
+    expect(t.evidence.getClaim(year.id)!.status).toBe('flagged');
+    expect(t.evidence.getClaim(wrong.id)).toMatchObject({ status: 'removed', reason: 'Number not in the quote: 50%' });
+  });
+});
+
 describe('verifyClaims: checker verdicts', () => {
   const base = { text: 'The Moon orbits Earth.', url: 'https://www.nasa.gov/moon', quote: 'The Moon orbits Earth at an average distance' };
   it.each([

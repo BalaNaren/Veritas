@@ -47,10 +47,11 @@ function overlap(a: Set<string>, b: Set<string>): number {
   return shared / Math.min(a.size, b.size);
 }
 
-/** A year the claim adds is fine when it is the year the page itself says it was published. */
-function unexplainedContext<T extends { value: number; raw: string }>(missing: readonly T[], source: SourceRow): T[] {
+/** A year the claim adds is fine when it is the year the page itself says it was published (or, for computed claims, appears in the run's output). */
+function unexplainedContext<T extends { value: number; raw: string }>(missing: readonly T[], source: SourceRow, runOutput?: string): T[] {
   const year = source.publishedAt ? new Date(source.publishedAt).getUTCFullYear() : NaN;
-  return missing.filter((n) => !(Number.isFinite(year) && /^\d{4}$/.test(n.raw) && n.value === year));
+  // For computed claims, a year or day that appears anywhere in the run's own output (for example inside a key name) is accounted for.
+  return missing.filter((n) => !(Number.isFinite(year) && /^\d{4}$/.test(n.raw) && n.value === year) && !(runOutput && new RegExp(`(?<!\\d)${n.value}(?!\\d)`).test(runOutput)));
 }
 
 const pass = (step: string, detail: string): CheckResult => ({ step, passed: true, detail });
@@ -139,8 +140,8 @@ async function verifyOne(claim: ClaimRow, all: readonly ClaimRow[], sources: rea
     checks.push(fail('numbers', `The claim states ${list}, which the quote does not contain`));
     if (claim.type === 'number' || claim.type === 'computed') return done('removed', `Number not in the quote: ${list}`, source, match.start!, match.end!);
     numbersReason = `Figures not in the quote: ${list}`;
-  } else if (unexplainedContext(nums.contextMissing, source).length) {
-    const list = unexplainedContext(nums.contextMissing, source).map((m) => m.raw).join(', ');
+  } else if (unexplainedContext(nums.contextMissing, source, claim.type === 'computed' ? snapshot : undefined).length) {
+    const list = unexplainedContext(nums.contextMissing, source, claim.type === 'computed' ? snapshot : undefined).map((m) => m.raw).join(', ');
     checks.push(fail('numbers', `The claim gives ${list} as context, but the quote does not name it`));
     numbersReason = `Date or year not in the quote: ${list}`;
   } else if (nums.claimNumbers.length) {
